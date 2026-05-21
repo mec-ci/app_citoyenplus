@@ -33,6 +33,7 @@ class _CreateAccountViewState extends State<CreateAccountView> {
       phone: phoneCtrl.text.trim(),
       password: passwordCtrl.text.trim(),
     );
+    if (!mounted) return;
     setState(() => isLoading = false);
     if (result["success"]) {
       ScaffoldMessenger.of(context).showSnackBar(

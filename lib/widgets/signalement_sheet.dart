@@ -118,11 +118,12 @@ class _SignalementSheetState extends State<_SignalementSheet> {
           accuracy: LocationAccuracy.high,
         ),
       );
-      if (mounted)
+      if (mounted) {
         setState(() {
           _latitude = position.latitude;
           _longitude = position.longitude;
         });
+      }
     } catch (e) {
       if (mounted) _showSnack('Erreur localisation : $e');
     } finally {
@@ -196,17 +197,19 @@ class _SignalementSheetState extends State<_SignalementSheet> {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString('token') ?? '';
       final result = await fetchAllCategories(token);
-      if (mounted)
+      if (mounted) {
         setState(() {
           _categories = result;
           _categoriesLoading = false;
         });
+      }
     } catch (e) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _categoriesError = 'Impossible de charger les catégories.';
           _categoriesLoading = false;
         });
+      }
     }
   }
 
@@ -235,7 +238,7 @@ class _SignalementSheetState extends State<_SignalementSheet> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: _blue.withOpacity(0.1),
+                    color: _blue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.camera_alt, color: _blue),
@@ -253,7 +256,7 @@ class _SignalementSheetState extends State<_SignalementSheet> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: _orange.withOpacity(0.1),
+                    color: _orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: const Icon(Icons.photo_library, color: _orange),
@@ -424,8 +427,8 @@ class _SignalementSheetState extends State<_SignalementSheet> {
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
                   color: _latitude != null
-                      ? const Color(0xFF34C759).withOpacity(0.4)
-                      : _orange.withOpacity(0.3),
+                      ? const Color(0xFF34C759).withValues(alpha: 0.4)
+                      : _orange.withValues(alpha: 0.3),
                 ),
               ),
               child: Row(
@@ -514,6 +517,23 @@ class _SignalementSheetState extends State<_SignalementSheet> {
                   ),
                 ],
               )
+            else if (_categories.isEmpty)
+              Row(
+                children: [
+                  const Icon(Icons.info_outline, color: _orange, size: 18),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Aucune catégorie disponible.',
+                      style: TextStyle(fontSize: 13, color: _orange),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: _loadCategories,
+                    child: const Text('Réessayer'),
+                  ),
+                ],
+              )
             else
               DropdownButtonFormField<CategorieSignalementModel>(
                 decoration: _fieldDecoration(
@@ -521,9 +541,9 @@ class _SignalementSheetState extends State<_SignalementSheet> {
                   Icons.category_outlined,
                 ),
                 hint: const Text('Sélectionner une catégorie'),
-                value: _selectedCategorie,
+                initialValue: _selectedCategorie,
                 borderRadius: BorderRadius.circular(14),
-                menuMaxHeight: 200, // ✅ limite la hauteur du menu
+                menuMaxHeight: 200,
                 isExpanded: true,
                 items: _categories
                     .map(

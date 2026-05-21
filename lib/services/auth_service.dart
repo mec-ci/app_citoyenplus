@@ -110,6 +110,45 @@ class AuthService {
     
   }
 
+  // MOT DE PASSE OUBLIÉ
+  static Future<Map<String, dynamic>> forgotPassword({
+    required String email,
+  }) async {
+    final url = Uri.parse("$baseUrl/auth/forgot-password");
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+        },
+        body: jsonEncode({"email": email}),
+      );
+
+      final contentType = response.headers['content-type'] ?? '';
+      if (!contentType.contains('application/json')) {
+        return {"success": false, "message": "Réponse invalide du serveur"};
+      }
+
+      final data = jsonDecode(response.body);
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          "success": true,
+          "message": data["message"] ?? "Un email de réinitialisation a été envoyé.",
+        };
+      } else {
+        dynamic message = data["message"];
+        if (message is List && message.isNotEmpty) message = message.join("\n");
+        if (message is! String) message = "Une erreur est survenue. Réessaie.";
+        return {"success": false, "message": message};
+      }
+    } catch (_) {
+      return {"success": false, "message": "Erreur réseau, réessaie encore 🙏🏾"};
+    }
+  }
+
   static Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');

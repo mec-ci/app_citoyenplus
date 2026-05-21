@@ -7,12 +7,16 @@ const _red = Color(0xFFFF2D55);
 
 class Quizquestions extends StatefulWidget {
   final String categorie;
+  final int level;
   final List<Map<String, dynamic>> questions;
+  final Future<void> Function(bool passed)? onLevelCompleted;
 
   const Quizquestions({
     super.key,
     required this.categorie,
+    required this.level,
     required this.questions,
+    this.onLevelCompleted,
   });
 
   @override
@@ -49,8 +53,13 @@ class QuizPageState extends State<Quizquestions> {
   void _showResult() {
     final total = widget.questions.length;
     final pct = (score / total * 100).round();
-    final emoji = pct >= 80 ? '🏆' : pct >= 50 ? '👍' : '💪';
-    final msg = pct >= 80 ? 'Excellent !' : pct >= 50 ? 'Bien joué !' : 'Continue à apprendre !';
+    final passed = pct >= 60;
+    final emoji = pct >= 80 ? '🏆' : pct >= 60 ? '👍' : '💪';
+    final msg = pct >= 80
+        ? 'Excellent !'
+        : pct >= 60
+            ? 'Niveau réussi !'
+            : 'Continue à apprendre !';
 
     showDialog(
       context: context,
@@ -63,21 +72,66 @@ class QuizPageState extends State<Quizquestions> {
           children: [
             Text(emoji, style: const TextStyle(fontSize: 52)),
             const SizedBox(height: 12),
-            Text(msg, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800, color: Colors.black87)),
+            Text(
+              msg,
+              style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: Colors.black87),
+            ),
             const SizedBox(height: 8),
             Text(
-              '$score / $total bonnes réponses',
+              '$score / $total bonnes réponses ($pct%)',
               style: TextStyle(fontSize: 15, color: Colors.grey[600]),
             ),
+            const SizedBox(height: 6),
+            if (passed && widget.level < 3)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _green.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '🔓 Niveau ${widget.level + 1} débloqué !',
+                  style: const TextStyle(
+                    color: _green,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            if (!passed)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: _orange.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'Obtiens 60% pour passer au niveau suivant',
+                  style: TextStyle(
+                    color: _orange,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
             const SizedBox(height: 16),
-            // Barre de score
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: LinearProgressIndicator(
                 value: score / total,
                 minHeight: 10,
                 backgroundColor: Colors.grey[200],
-                color: pct >= 80 ? _green : pct >= 50 ? _orange : _red,
+                color: pct >= 80
+                    ? _green
+                    : pct >= 60
+                        ? _orange
+                        : _red,
               ),
             ),
             const SizedBox(height: 24),
@@ -86,14 +140,25 @@ class QuizPageState extends State<Quizquestions> {
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _orange,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12)),
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                onPressed: () {
+                onPressed: () async {
                   Navigator.pop(context);
-                  Navigator.pop(context);
+                  if (widget.onLevelCompleted != null) {
+                    await widget.onLevelCompleted!(passed);
+                  }
+                  if (mounted) Navigator.pop(context);
                 },
-                child: const Text('Retour aux quiz', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15)),
+                child: const Text(
+                  'Retour aux niveaux',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
               ),
             ),
           ],
@@ -118,18 +183,31 @@ class QuizPageState extends State<Quizquestions> {
           icon: const Icon(Icons.close, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          widget.categorie,
-          style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w700, fontSize: 16),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.categorie,
+              style: const TextStyle(
+                  color: Colors.black87,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 15),
+            ),
+            Text(
+              'Niveau ${widget.level}',
+              style: TextStyle(color: Colors.grey[500], fontSize: 11),
+            ),
+          ],
         ),
-        centerTitle: true,
+        centerTitle: false,
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Center(
               child: Text(
                 '$score pts',
-                style: const TextStyle(color: _orange, fontWeight: FontWeight.w800, fontSize: 15),
+                style: const TextStyle(
+                    color: _orange, fontWeight: FontWeight.w800, fontSize: 15),
               ),
             ),
           ),
@@ -140,12 +218,15 @@ class QuizPageState extends State<Quizquestions> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Barre de progression ───────────────────────────────────
+            // Barre de progression
             Row(
               children: [
                 Text(
                   'Question ${questionIndex + 1}',
-                  style: const TextStyle(fontWeight: FontWeight.w700, color: Colors.black87, fontSize: 13),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                      fontSize: 13),
                 ),
                 const Spacer(),
                 Text(
@@ -166,23 +247,33 @@ class QuizPageState extends State<Quizquestions> {
             ),
             const SizedBox(height: 28),
 
-            // ── Question ───────────────────────────────────────────────
+            // Question
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(18),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 3))],
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
+                  )
+                ],
               ),
               child: Text(
                 question['question'],
-                style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: Colors.black87, height: 1.4),
+                style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black87,
+                    height: 1.4),
               ),
             ),
             const SizedBox(height: 24),
 
-            // ── Options ────────────────────────────────────────────────
+            // Options
             Expanded(
               child: ListView.builder(
                 physics: const NeverScrollableScrollPhysics(),
@@ -199,18 +290,20 @@ class QuizPageState extends State<Quizquestions> {
                   if (_answered) {
                     if (isCorrect) {
                       borderColor = _green;
-                      bgColor = _green.withOpacity(0.08);
+                      bgColor = _green.withValues(alpha: 0.08);
                       textColor = _green;
-                      trailing = const Icon(Icons.check_circle, color: _green, size: 20);
+                      trailing = const Icon(Icons.check_circle,
+                          color: _green, size: 20);
                     } else if (isSelected && !isCorrect) {
                       borderColor = _red;
-                      bgColor = _red.withOpacity(0.08);
+                      bgColor = _red.withValues(alpha: 0.08);
                       textColor = _red;
-                      trailing = const Icon(Icons.cancel, color: _red, size: 20);
+                      trailing =
+                          const Icon(Icons.cancel, color: _red, size: 20);
                     }
                   } else if (isSelected) {
                     borderColor = _orange;
-                    bgColor = _orange.withOpacity(0.08);
+                    bgColor = _orange.withValues(alpha: 0.08);
                     textColor = _orange;
                   }
 
@@ -218,26 +311,36 @@ class QuizPageState extends State<Quizquestions> {
                     onTap: () => _selectAnswer(i),
                     child: Container(
                       margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 14),
                       decoration: BoxDecoration(
                         color: bgColor,
                         borderRadius: BorderRadius.circular(14),
                         border: Border.all(color: borderColor, width: 1.5),
-                        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6, offset: const Offset(0, 2))],
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          )
+                        ],
                       ),
                       child: Row(
                         children: [
-                          // Lettre A B C D
                           Container(
-                            width: 28, height: 28,
+                            width: 28,
+                            height: 28,
                             decoration: BoxDecoration(
-                              color: borderColor.withOpacity(0.15),
+                              color: borderColor.withValues(alpha: 0.15),
                               shape: BoxShape.circle,
                             ),
                             child: Center(
                               child: Text(
                                 ['A', 'B', 'C', 'D'][i],
-                                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: borderColor),
+                                style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    color: borderColor),
                               ),
                             ),
                           ),
@@ -245,7 +348,10 @@ class QuizPageState extends State<Quizquestions> {
                           Expanded(
                             child: Text(
                               question['options'][i],
-                              style: TextStyle(fontSize: 14, color: textColor, fontWeight: FontWeight.w500),
+                              style: TextStyle(
+                                  fontSize: 14,
+                                  color: textColor,
+                                  fontWeight: FontWeight.w500),
                             ),
                           ),
                           if (trailing != null) trailing,
@@ -257,7 +363,7 @@ class QuizPageState extends State<Quizquestions> {
               ),
             ),
 
-            // ── Bouton Suivant ─────────────────────────────────────────
+            // Bouton suivant
             SizedBox(
               width: double.infinity,
               height: 52,
@@ -266,11 +372,14 @@ class QuizPageState extends State<Quizquestions> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _orange,
                   disabledBackgroundColor: Colors.grey[200],
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14)),
                   elevation: 0,
                 ),
                 child: Text(
-                  questionIndex < total - 1 ? 'Question suivante →' : 'Voir le résultat',
+                  questionIndex < total - 1
+                      ? 'Question suivante →'
+                      : 'Voir le résultat',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,

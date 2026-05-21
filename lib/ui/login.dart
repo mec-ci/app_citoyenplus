@@ -1,6 +1,7 @@
 import 'package:citoyen_plus/ui/accueil.dart';
 import 'package:flutter/material.dart';
 import 'signup.dart';
+import 'forgot_password_view.dart';
 import '../services/auth_service.dart';
 
 const _orange = Color(0xFFFF7F00);
@@ -28,6 +29,7 @@ class LoginViewState extends State<LoginView> {
       email: emailCtrl.text.trim(),
       password: passwordCtrl.text.trim(),
     );
+    if (!mounted) return;
     setState(() => isLoading = false);
     if (result["success"]) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -157,7 +159,10 @@ class LoginViewState extends State<LoginView> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () {},
+                    onPressed: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ForgotPasswordView()),
+                    ),
                     style: TextButton.styleFrom(foregroundColor: _blue),
                     child: const Text(
                       'Mot de passe oublié ?',

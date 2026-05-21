@@ -26,14 +26,14 @@ class UserService {
     required String phone,
   }) async {
     final url = Uri.parse('$baseUrl/users');
-    final response = await http.put(
+    final response = await http.patch(
       url,
       headers: {
         'Authorization': 'Bearer $token',
         'Content-Type': 'application/json',
       },
-      body: jsonEncode({"name": name, "email": email, "hone": phone}),
+      body: jsonEncode({"fullname": name, "email": email, "phone": phone}),
     );
-    return response.statusCode == 200;
+    return response.statusCode == 200 || response.statusCode == 201;
   }
 }

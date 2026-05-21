@@ -1,36 +1,55 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../models/post.dart';
 
+Future<PostModel> createArticle(
+  String title,
+  String content,
+  String token, {
+  required DateTime date,
+  File? image,
+}) async {
+  final uri = Uri.parse('https://admin.mec-ci.org/api/v1/actualites');
 
+  if (image != null) {
+    final request = http.MultipartRequest('POST', uri)
+      ..headers['Authorization'] = 'Bearer $token'
+      ..fields['title'] = title
+      ..fields['content'] = content
+      ..fields['date'] = date.toIso8601String()
+      ..files.add(await http.MultipartFile.fromPath('imageUrl', image.path));
 
-Future<PostModel> createArticle(String title, String excerpt, String content, String token, {required DateTime date}) async {
-  final response = await http.post(
-    Uri.parse('https://admin.mec-ci.org/api/v1/actualites'),
-    headers: <String, String>{
-      'Content-Type': 'application/json; charset=UTF-8',
-      "Authorization": "Bearer $token",
-    },
-    body: jsonEncode(<String, String>{
-      'title': title,
-      'excerpt': excerpt,
-      'content': content,
-      'date': date.toIso8601String(),
-    }),
-  );
-  // 🔥 DEBUG
-  // print("STATUS CODE: ${response.statusCode}");
-  // print("RESPONSE BODY: ${response.body}");
-  // print("RESPONSE HEADERS: ${response.headers}");
+    final streamed = await request.send();
+    final response = await http.Response.fromStream(streamed);
 
-  if (response.statusCode == 200 || response.statusCode == 201) {
-    // If the server did return a 201 CREATED response,
-    // then parse the JSON.
-    return PostModel.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return PostModel.fromJson(
+          jsonDecode(response.body) as Map<String, dynamic>);
+    } else {
+      throw Exception(
+          'Échec publication. Status: ${response.statusCode}, Body: ${response.body}');
+    }
   } else {
-    
-    throw Exception('Failed to create article. Status: ${response.statusCode}, Body: ${response.body}');
+    final response = await http.post(
+      uri,
+      headers: {
+        'Content-Type': 'application/json; charset=UTF-8',
+        'Authorization': 'Bearer $token',
+      },
+      body: jsonEncode({
+        'title': title,
+        'content': content,
+        'date': date.toIso8601String(),
+      }),
+    );
+
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      return PostModel.fromJson(
+          jsonDecode(response.body) as Map<String, dynamic>);
+    } else {
+      throw Exception(
+          'Échec publication. Status: ${response.statusCode}, Body: ${response.body}');
+    }
   }
 }
-
-
