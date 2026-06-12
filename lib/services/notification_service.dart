@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class NotificationService {
@@ -17,29 +17,31 @@ class NotificationService {
       defaultActionName: 'Open notification',
     );
 
-    await _plugin.initialize(
-      const InitializationSettings(
-        android: androidSettings,
-        iOS: iosSettings,
-        linux: linuxSettings, // ✅ Ajouté
-      ),
-    );
-
-    // Demande la permission selon la plateforme cible (téléphone)
-    if (Platform.isAndroid) {
-      final androidPlugin = _plugin
-          .resolvePlatformSpecificImplementation<
-              AndroidFlutterLocalNotificationsPlugin>();
-      await androidPlugin?.requestNotificationsPermission();
-    } else if (Platform.isIOS) {
-      final iosPlugin = _plugin
-          .resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin>();
-      await iosPlugin?.requestPermissions(
-        alert: true,
-        badge: true,
-        sound: true,
+    if (!kIsWeb) {
+      await _plugin.initialize(
+        const InitializationSettings(
+          android: androidSettings,
+          iOS: iosSettings,
+          linux: linuxSettings,
+        ),
       );
+
+      // Demande la permission selon la plateforme cible (téléphone)
+      if (defaultTargetPlatform == TargetPlatform.android) {
+        final androidPlugin = _plugin
+            .resolvePlatformSpecificImplementation<
+                AndroidFlutterLocalNotificationsPlugin>();
+        await androidPlugin?.requestNotificationsPermission();
+      } else if (defaultTargetPlatform == TargetPlatform.iOS) {
+        final iosPlugin = _plugin
+            .resolvePlatformSpecificImplementation<
+                IOSFlutterLocalNotificationsPlugin>();
+        await iosPlugin?.requestPermissions(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+      }
     }
   }
 
@@ -48,6 +50,10 @@ class NotificationService {
     required String titre,
     required String corps,
   }) async {
+    if (kIsWeb) {
+      return;
+    }
+
     await _plugin.show(
       DateTime.now().millisecondsSinceEpoch ~/ 1000,
       titre,
@@ -62,7 +68,7 @@ class NotificationService {
           icon: '@mipmap/ic_launcher',
         ),
         iOS: DarwinNotificationDetails(),
-        linux: LinuxNotificationDetails(), // ✅ Ajouté
+        linux: LinuxNotificationDetails(),
       ),
     );
   }

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import 'detail_page.dart';
 import 'regions_page.dart';
 import 'livre_pdf_view.dart';
@@ -15,24 +18,20 @@ class _LibrairieViewState extends State<LibrairieView>
   static const _orange = Color(0xFFFF7F00);
   static const _blue = Color(0xFF1556B5);
 
-  final List<Map<String, String>> documents = [
-    {"titre": "BUDGET CITOYEN", "couverture": "assets/budget2021.png", "description": "", "pdf": "assets/BUDGET-CITOYEN.pdf"},
-    {"titre": "BUDGET CITOYEN 2024", "couverture": "assets/budget2024.png", "description": "", "pdf": "assets/BUDGET-CITOYEN_2024.pdf"},
-    {"titre": "BUDGET CITOYEN 2025", "couverture": "assets/budget2025.png", "description": "", "pdf": "assets/BUDGET-CITOYEN_2025.pdf"},
-    {"titre": "CNDH", "couverture": "assets/cndh.png", "description": "Les droits catégoriels et leur mise en œuvre en Côte d'Ivoire", "pdf": "assets/CNDH.pdf"},
-    {"titre": "CODE D'ETHIQUE ET DE DEONTOLOGIE DGBF", "couverture": "assets/code_ethique.png", "description": "", "pdf": "assets/dgbf.pdf"},
-  ];
-
-  late List<Map<String, String>> filteredDocuments;
+  List<Map<String, dynamic>> documents = [];
+  late List<Map<String, dynamic>> filteredDocuments;
   final TextEditingController searchCtrl = TextEditingController();
   late TabController _tabController;
+  bool _isLoadingDocuments = true;
+  String? _documentsError;
 
   @override
   void initState() {
     super.initState();
-    filteredDocuments = List<Map<String, String>>.from(documents);
+    filteredDocuments = [];
     searchCtrl.addListener(() => filterDocuments(searchCtrl.text));
     _tabController = TabController(length: 2, vsync: this);
+    _loadDocuments();
   }
 
   @override
@@ -42,14 +41,38 @@ class _LibrairieViewState extends State<LibrairieView>
     super.dispose();
   }
 
+  Future<void> _loadDocuments() async {
+    setState(() {
+      _isLoadingDocuments = true;
+      _documentsError = null;
+    });
+    try {
+      final token = await AuthService.getToken();
+      final docs = await ApiService.fetchLibraryDocuments('1', token ?? '');
+      if (!mounted) return;
+      setState(() {
+        documents = docs;
+        filteredDocuments = List<Map<String, dynamic>>.from(docs);
+        _isLoadingDocuments = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _documentsError = e.toString();
+        _isLoadingDocuments = false;
+      });
+    }
+  }
+
   void filterDocuments(String query) {
     final q = query.trim().toLowerCase();
     setState(() {
       filteredDocuments = q.isEmpty
-          ? List<Map<String, String>>.from(documents)
+          ? List<Map<String, dynamic>>.from(documents)
           : documents.where((doc) {
-              return (doc['titre'] ?? '').toLowerCase().contains(q) ||
-                  (doc['description'] ?? '').toLowerCase().contains(q);
+              final title = (doc['titre'] ?? doc['title'] ?? '').toString().toLowerCase();
+              final description = (doc['description'] ?? '').toString().toLowerCase();
+              return title.contains(q) || description.contains(q);
             }).toList();
     });
   }
@@ -84,7 +107,7 @@ class _LibrairieViewState extends State<LibrairieView>
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: Colors.grey.shade200),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+                    boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 2))],
                   ),
                   child: Row(
                     children: [
@@ -108,6 +131,18 @@ class _LibrairieViewState extends State<LibrairieView>
                     ],
                   ),
                 ),
+                const SizedBox(height: 16),
+
+                if (_isLoadingDocuments)
+                  const Center(child: CircularProgressIndicator())
+                else if (_documentsError != null)
+                  Column(
+                    children: [
+                      Text('Erreur : $_documentsError', style: const TextStyle(color: Colors.red)),
+                      const SizedBox(height: 8),
+                      TextButton(onPressed: _loadDocuments, child: const Text('Réessayer')),
+                    ],
+                  ),
                 const SizedBox(height: 16),
 
                 // ── Tabs ───────────────────────────────────────────────
@@ -182,20 +217,29 @@ class _LibrairieViewState extends State<LibrairieView>
       itemCount: filteredDocuments.length,
       itemBuilder: (context, i) {
         final doc = filteredDocuments[i];
+        final title = doc['titre'] ?? doc['title'] ?? 'Document';
+        final description = doc['description'] ?? '';
+        final imageUrl = doc['couverture'] ?? doc['image'] ?? '';
+        final rawUrl = doc['pdf'] ?? doc['url'] ?? doc['documentUrl'] ?? '';
+
         return GestureDetector(
-          onTap: () {
-            final pdfPath = doc['pdf'] ?? '';
-            if (pdfPath.isNotEmpty) {
-              Navigator.push(context, MaterialPageRoute(builder: (_) => LivrePdfView(pdf: pdfPath)));
+          onTap: () async {
+            if (rawUrl.isNotEmpty) {
+              final uri = Uri.tryParse(rawUrl);
+              if (uri != null && (uri.isScheme('http') || uri.isScheme('https'))) {
+                await launchUrl(uri);
+                return;
+              }
+              Navigator.push(context, MaterialPageRoute(builder: (_) => LivrePdfView(pdf: rawUrl)));
             } else {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('PDF introuvable')));
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Document introuvable')));
             }
           },
           child: Container(
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 4))],
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 4))],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -204,15 +248,20 @@ class _LibrairieViewState extends State<LibrairieView>
                 Expanded(
                   child: ClipRRect(
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                    child: Image.asset(
-                      doc['couverture'] ?? '',
-                      width: double.infinity,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: Colors.grey[100],
-                        child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
-                      ),
-                    ),
+                    child: imageUrl.isNotEmpty
+                        ? Image.network(
+                            imageUrl,
+                            width: double.infinity,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Container(
+                              color: Colors.grey[100],
+                              child: const Center(child: Icon(Icons.broken_image, color: Colors.grey)),
+                            ),
+                          )
+                        : Container(
+                            color: Colors.grey[100],
+                            child: const Center(child: Icon(Icons.insert_drive_file_outlined, color: Colors.grey)),
+                          ),
                   ),
                 ),
                 // Texte
@@ -222,15 +271,15 @@ class _LibrairieViewState extends State<LibrairieView>
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        doc['titre'] ?? '',
+                        title,
                         style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 12, color: Colors.black87),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      if ((doc['description'] ?? '').isNotEmpty) ...[
+                      if ((description ?? '').toString().isNotEmpty) ...[
                         const SizedBox(height: 3),
                         Text(
-                          doc['description'] ?? '',
+                          description.toString(),
                           style: TextStyle(fontSize: 10, color: Colors.grey[500]),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -288,8 +337,8 @@ class _LibrairieViewState extends State<LibrairieView>
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: color.withOpacity(0.15), width: 1.5),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))],
+              border: Border.all(color: color.withValues(alpha: 0.15), width: 1.5),
+              boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
             ),
             child: Row(
               children: [
@@ -297,7 +346,7 @@ class _LibrairieViewState extends State<LibrairieView>
                 Container(
                   width: 52, height: 52,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Center(
@@ -334,7 +383,7 @@ class _LibrairieViewState extends State<LibrairieView>
                 Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.08),
+                    color: color.withValues(alpha: 0.08),
                     shape: BoxShape.circle,
                   ),
                   child: Icon(Icons.arrow_forward_ios, size: 12, color: color),

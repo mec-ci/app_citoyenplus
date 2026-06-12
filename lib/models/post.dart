@@ -1,3 +1,5 @@
+import '../config/api_config.dart';
+
 class PostModel {
   final String id;
   final String slug;
@@ -25,10 +27,10 @@ class PostModel {
       title: json['title'] ?? '',
       excerpt: json['excerpt'] ?? '',
       content: json['content'] ?? '',
-      imageUrl: (rawImage != null && rawImage.isNotEmpty)
+        imageUrl: (rawImage != null && rawImage.isNotEmpty)
           ? (rawImage.startsWith('http')
-              ? rawImage
-              : 'https://admin.mec-ci.org$rawImage')
+            ? rawImage
+            : '${ApiConfig.host}$rawImage')
           : null,
       date: json['date'] != null
           ? DateTime.parse(json['date'])

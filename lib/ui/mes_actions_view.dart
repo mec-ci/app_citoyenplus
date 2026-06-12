@@ -26,9 +26,8 @@ class _MesActionsViewState extends State<MesActionsView> {
 
   Future<List<SignalementModel>> _loadMesSignalements() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
     final citoyenId = prefs.getString('citoyenId') ?? '';
-    return MesSignalementsService.fetchMesSignalements(token, citoyenId);
+    return MesSignalementsService.fetchMesSignalements(citoyenId);
   }
 
   @override
@@ -218,7 +217,7 @@ class _ActionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -272,9 +271,9 @@ class _ActionCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: couleur.withOpacity(0.12),
+                        color: couleur.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: couleur.withOpacity(0.4)),
+                        border: Border.all(color: couleur.withValues(alpha: 0.4)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,

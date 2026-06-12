@@ -57,10 +57,8 @@ class _ActualiteListState extends State<ActualiteList> {
             setState(() {
               _futureAlbum = createArticle(
                 _titleController.text,
-                _excerptController.text,
                 _contentController.text,
-                 
-                  date: DateTime.now(), // Replace with actual token
+                date: DateTime.now(),
               );
             });
           },

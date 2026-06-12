@@ -1,16 +1,12 @@
 import 'dart:convert';
 import 'package:citoyen_plus/models/post.dart';
-import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
+import 'auth_service.dart';
 
 class RecupererActualiteService {
   static Future<List<PostModel>> fetchAllPosts(String token) async {
-    final response = await http.get(
-      Uri.parse('https://admin.mec-ci.org/api/v1/actualites'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+    final url = Uri.parse('${ApiConfig.baseUrl}/actualites');
+    final response = await AuthService.authorizedGet(url);
 
     //print('📥 POSTS STATUS : ${response.statusCode}');
     //print('📥 POSTS BODY   : ${response.body}');

@@ -1,15 +1,12 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http ;
+import 'auth_service.dart';
+import '../config/api_config.dart';
 
 import '../models/categorie_signalement_model.dart';
 
-Future<List<CategorieSignalementModel>> fetchAllCategories(String token) async {
-  final response = await http.get(
-    Uri.parse('https://admin.mec-ci.org/api/v1/categorie-signalement'),
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Bearer $token',
-    },
+Future<List<CategorieSignalementModel>> fetchAllCategories() async {
+  final response = await AuthService.authorizedGet(
+    Uri.parse('${ApiConfig.baseUrl}/categorie-signalement'),
   );
 
   if (response.statusCode == 200) {

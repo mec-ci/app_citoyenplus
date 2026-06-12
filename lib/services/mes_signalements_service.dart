@@ -1,17 +1,13 @@
 import 'dart:convert';
 import 'package:citoyen_plus/models/signalement.dart';
-import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
+import 'auth_service.dart';
 
 class MesSignalementsService {
   static Future<List<SignalementModel>> fetchMesSignalements(
-      String token, String citoyenId) async {
-    final response = await http.get(
-      Uri.parse('https://admin.mec-ci.org/api/v1/signalement-citoyen'),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer $token',
-      },
-    );
+      String citoyenId) async {
+    final url = Uri.parse('${ApiConfig.baseUrl}/signalement-citoyen');
+    final response = await AuthService.authorizedGet(url);
 
     if (response.statusCode == 200) {
       final Map<String, dynamic> jsonResponse = jsonDecode(response.body);

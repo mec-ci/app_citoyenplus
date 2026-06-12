@@ -51,7 +51,7 @@ class EntetePersonalise extends StatelessWidget implements PreferredSizeWidget {
             margin: const EdgeInsets.symmetric(vertical: 10),
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: _blue.withOpacity(0.08),
+              color: _blue.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
             child: const Icon(Icons.person_outline_rounded, size: 22, color: _blue),
@@ -67,7 +67,7 @@ class EntetePersonalise extends StatelessWidget implements PreferredSizeWidget {
             margin: const EdgeInsets.symmetric(vertical: 10),
             padding: const EdgeInsets.all(7),
             decoration: BoxDecoration(
-              color: _orange.withOpacity(0.08),
+              color: _orange.withValues(alpha: 0.08),
               shape: BoxShape.circle,
             ),
             child: Transform.rotate(

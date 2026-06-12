@@ -1,3 +1,5 @@
+import '../config/api_config.dart';
+
 class SignalementModel {
   final String id;
   final String titre;
@@ -45,8 +47,8 @@ class SignalementModel {
       longitude: (json['longitude'] is String)
           ? double.parse(json['longitude'])
           : (json['longitude'] as num).toDouble(),
-      photo: json['photo'] != null
-          ? 'https://admin.mec-ci.org${json['photo']}'
+        photo: json['photo'] != null
+          ? '${ApiConfig.host}${json['photo']}'
           : null,
       statut: json['statut'],
       citoyenId: json['citoyenId'] ?? '',

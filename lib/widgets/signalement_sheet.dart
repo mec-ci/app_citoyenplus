@@ -1,9 +1,8 @@
-import 'dart:io';
+import 'dart:typed_data';
+import 'package:image_picker/image_picker.dart';
 import 'package:citoyen_plus/services/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:citoyen_plus/services/ajouter_signalement.dart';
 import '../models/categorie_signalement_model.dart';
 import '../services/recuperer_categorie_signalement_service.dart';
@@ -41,7 +40,8 @@ class _SignalementSheetState extends State<_SignalementSheet> {
 
   double? _latitude;
   double? _longitude;
-  File? _photo;
+  XFile? _photo;
+  Uint8List? _photoBytes;
   bool _locating = true;
   bool _submitting = false;
 
@@ -194,9 +194,7 @@ class _SignalementSheetState extends State<_SignalementSheet> {
       _categoriesError = null;
     });
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token') ?? '';
-      final result = await fetchAllCategories(token);
+      final result = await fetchAllCategories();
       if (mounted) {
         setState(() {
           _categories = result;
@@ -218,7 +216,13 @@ class _SignalementSheetState extends State<_SignalementSheet> {
   Future<void> _pickPhoto(ImageSource source) async {
     final picker = ImagePicker();
     final picked = await picker.pickImage(source: source, imageQuality: 80);
-    if (picked != null && mounted) setState(() => _photo = File(picked.path));
+    if (picked != null && mounted) {
+      final bytes = await picked.readAsBytes();
+      setState(() {
+        _photo = picked;
+        _photoBytes = bytes;
+      });
+    }
   }
 
   void _showPhotoOptions() {
@@ -290,13 +294,6 @@ class _SignalementSheetState extends State<_SignalementSheet> {
     }
     setState(() => _submitting = true);
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token') ?? '';
-      if (token.isEmpty) {
-        _showSnack('Token manquant. Connecte-toi d\'abord.');
-        setState(() => _submitting = false);
-        return;
-      }
       final newSignalement = await createSignalement(
         titre: _titreController.text.trim(),
         description: _descriptionController.text.trim(),
@@ -304,7 +301,6 @@ class _SignalementSheetState extends State<_SignalementSheet> {
         adresse: _adresseController.text.trim(),
         latitude: _latitude!,
         longitude: _longitude!,
-        token: token,
         photo: _photo,
       );
       if (mounted) {
@@ -610,7 +606,10 @@ class _SignalementSheetState extends State<_SignalementSheet> {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            Image.file(_photo!, fit: BoxFit.cover),
+                            if (_photoBytes != null)
+                              Image.memory(_photoBytes!, fit: BoxFit.cover)
+                            else
+                              const SizedBox.shrink(),
                             Positioned(
                               top: 8,
                               right: 8,

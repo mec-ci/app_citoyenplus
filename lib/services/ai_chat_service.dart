@@ -1,17 +1,19 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import '../config/api_config.dart';
+import 'auth_service.dart';
 
 class AiChatService {
-  static const String _baseUrl =
-      'https://admin.mec-ci.org/api/v1/ai-chat'; // ← endpoint à créer sur ton backend
+  static final String _baseUrl = '${ApiConfig.baseUrl}/ai-chat'; // ← endpoint à créer sur ton backend
 
   /// Envoie l'historique complet des messages et reçoit la réponse de l'IA.
   /// [messages] = liste de { "role": "user"|"assistant", "content": "..." }
   static Future<String> sendMessage(
       List<Map<String, String>> messages) async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
+    final token = await AuthService.getToken();
+    if (token == null || token.isEmpty) {
+      throw Exception('Jeton manquant. Connecte-toi d\'abord.');
+    }
 
     final response = await http.post(
       Uri.parse(_baseUrl),

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api_service.dart';
+import '../services/auth_service.dart';
 import 'entete.dart';
 import 'quizquestions.dart';
 
@@ -9,7 +11,7 @@ const _green = Color(0xFF34C759);
 
 // ── Données des catégories ────────────────────────────────────────────────────
 
-final List<Map<String, dynamic>> _categories = [
+List<Map<String, dynamic>> _categories = [
   {"icon": Icons.flag_circle_outlined, "title": "Citoyenneté", "color": _orange},
   {"icon": Icons.directions_car_outlined, "title": "Code de la route", "color": _blue},
   {"icon": Icons.public_outlined, "title": "Côte d'Ivoire", "color": _orange},
@@ -32,11 +34,14 @@ class QuizView extends StatefulWidget {
 
 class _QuizViewState extends State<QuizView> {
   Map<String, Map<int, bool>> _progress = {};
+  bool _isLoadingCategories = true;
+  String? _categoriesError;
 
   @override
   void initState() {
     super.initState();
     _loadProgress();
+    _loadCategories();
   }
 
   Future<void> _loadProgress() async {
@@ -51,6 +56,52 @@ class _QuizViewState extends State<QuizView> {
       };
     }
     if (mounted) setState(() => _progress = progress);
+  }
+
+  Future<void> _loadCategories() async {
+    setState(() {
+      _isLoadingCategories = true;
+      _categoriesError = null;
+    });
+    try {
+      final token = await AuthService.getToken();
+      final categories = await ApiService.fetchQuizCategories(token ?? '');
+      if (!mounted) return;
+      setState(() {
+        _categories = categories.asMap().entries.map((entry) {
+          final index = entry.key;
+          final item = entry.value;
+          return {
+            'title': item['titre'] ?? item['title'] ?? item['name'] ?? 'Thème ${index + 1}',
+            'icon': _categoryIconForIndex(index),
+            'color': index.isEven ? _orange : _blue,
+          };
+        }).toList();
+        _isLoadingCategories = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _categoriesError = 'Impossible de charger les catégories de quiz';
+        _isLoadingCategories = false;
+      });
+    }
+  }
+
+  IconData _categoryIconForIndex(int index) {
+    const icons = [
+      Icons.flag_circle_outlined,
+      Icons.directions_car_outlined,
+      Icons.public_outlined,
+      Icons.gavel_outlined,
+      Icons.scale_outlined,
+      Icons.handshake_outlined,
+      Icons.phone_android_outlined,
+      Icons.eco_outlined,
+      Icons.how_to_vote_outlined,
+      Icons.account_balance,
+    ];
+    return icons[index % icons.length];
   }
 
   int _unlockedLevel(String categorie) {
@@ -112,17 +163,39 @@ class _QuizViewState extends State<QuizView> {
               const SizedBox(height: 16),
 
               // ── Grille catégories ─────────────────────────────────────
-              Expanded(
-                child: GridView.builder(
-                  itemCount: _categories.length,
-                  physics: const BouncingScrollPhysics(),
-                  gridDelegate:
-                      const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 14,
-                    mainAxisSpacing: 14,
-                    childAspectRatio: 3 / 3.8,
+              if (_isLoadingCategories)
+                const Expanded(
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_categoriesError != null)
+                Expanded(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_categoriesError!, style: const TextStyle(color: Colors.red)),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: _loadCategories,
+                          style: ElevatedButton.styleFrom(backgroundColor: _orange),
+                          child: const Text('Réessayer'),
+                        ),
+                      ],
+                    ),
                   ),
+                )
+              else
+                Expanded(
+                  child: GridView.builder(
+                    itemCount: _categories.length,
+                    physics: const BouncingScrollPhysics(),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 14,
+                      mainAxisSpacing: 14,
+                      childAspectRatio: 3 / 3.8,
+                    ),
                   itemBuilder: (context, index) {
                     final cat = _categories[index];
                     final Color color = cat["color"];

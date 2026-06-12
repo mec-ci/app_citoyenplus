@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../services/auth_service.dart';
 import 'accueil.dart';
 import 'login.dart';
 
@@ -40,15 +40,14 @@ class _SplashScreenState extends State<SplashScreen>
 
     _ctrl.forward();
 
-    Future.delayed(const Duration(seconds: 3), () async {
+    Future.delayed(const Duration(seconds: 2), () async {
       if (!mounted) return;
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token') ?? '';
+      final authenticated = await AuthService.isAuthenticated();
       if (!mounted) return;
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
           pageBuilder: (_, __, ___) =>
-              token.isNotEmpty ? const Home() : const LoginView(),
+              authenticated ? const Home() : const LoginView(),
           transitionsBuilder: (_, animation, __, child) =>
               FadeTransition(opacity: animation, child: child),
           transitionDuration: const Duration(milliseconds: 800),
@@ -79,7 +78,7 @@ class _SplashScreenState extends State<SplashScreen>
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _orange.withOpacity(0.08),
+                color: _orange.withValues(alpha: 0.08),
               ),
             ),
           ),
@@ -91,7 +90,7 @@ class _SplashScreenState extends State<SplashScreen>
               height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _orange.withOpacity(0.12),
+                color: _orange.withValues(alpha: 0.12),
               ),
             ),
           ),
@@ -103,7 +102,7 @@ class _SplashScreenState extends State<SplashScreen>
               height: 260,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _blue.withOpacity(0.07),
+                color: _blue.withValues(alpha: 0.07),
               ),
             ),
           ),
@@ -115,7 +114,7 @@ class _SplashScreenState extends State<SplashScreen>
               height: 50,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _blue.withOpacity(0.1),
+                color: _blue.withValues(alpha: 0.1),
               ),
             ),
           ),
@@ -144,13 +143,13 @@ class _SplashScreenState extends State<SplashScreen>
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: _orange.withOpacity(0.15),
+                            color: _orange.withValues(alpha: 0.15),
                             blurRadius: 40,
                             spreadRadius: 8,
                             offset: const Offset(0, 8),
                           ),
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 20,
                             offset: const Offset(0, 4),
                           ),

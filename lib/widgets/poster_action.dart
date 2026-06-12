@@ -1,7 +1,6 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/post_service.dart';
 
 void showPosterActionSheet(BuildContext context, VoidCallback onPublished) {
@@ -29,7 +28,8 @@ class _PosterActionSheetState extends State<_PosterActionSheet> {
   final _titreController = TextEditingController();
   final _contenuController = TextEditingController();
 
-  File? _image;
+  XFile? _image;
+  Uint8List? _imageBytes;
   bool _loading = false;
 
   static const _orange = Color(0xFFFF7F00);
@@ -74,10 +74,13 @@ class _PosterActionSheetState extends State<_PosterActionSheet> {
   }
 
   Future<void> _pickImage(ImageSource source) async {
-    final picked = await ImagePicker()
-        .pickImage(source: source, imageQuality: 80);
+    final picked = await ImagePicker().pickImage(source: source, imageQuality: 80);
     if (picked != null && mounted) {
-      setState(() => _image = File(picked.path));
+      final bytes = await picked.readAsBytes();
+      setState(() {
+        _image = picked;
+        _imageBytes = bytes;
+      });
     }
   }
 
@@ -142,24 +145,10 @@ class _PosterActionSheetState extends State<_PosterActionSheet> {
     }
     setState(() => _loading = true);
 
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
-    if (token.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text("Token manquant. Connecte-toi d'abord.")),
-        );
-        setState(() => _loading = false);
-      }
-      return;
-    }
-
     try {
       final newPost = await createArticle(
         _titreController.text.trim(),
         _contenuController.text.trim(),
-        token,
         date: DateTime.now(),
         image: _image,
       );
@@ -294,7 +283,10 @@ class _PosterActionSheetState extends State<_PosterActionSheet> {
                         child: Stack(
                           fit: StackFit.expand,
                           children: [
-                            Image.file(_image!, fit: BoxFit.cover),
+                            if (_imageBytes != null)
+                              Image.memory(_imageBytes!, fit: BoxFit.cover)
+                            else
+                              const SizedBox.shrink(),
                             Positioned(
                               top: 8,
                               right: 8,

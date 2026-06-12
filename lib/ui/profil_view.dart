@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'login.dart';
+import 'settings_view.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
+import '../services/api_service.dart';
 
 class ProfilView extends StatefulWidget {
-  const ProfilView({super.key});
+  final String? userId;
+  const ProfilView({super.key, this.userId});
 
   @override
   State<ProfilView> createState() => _ProfilViewState();
@@ -14,9 +17,14 @@ class _ProfilViewState extends State<ProfilView> {
   late TextEditingController fullnameCtrl;
   late TextEditingController emailCtrl;
   late TextEditingController phoneCtrl;
-
+  Map<String, dynamic> profileData = {};
+  int followersCount = 0;
+  int followingCount = 0;
+  bool isFollowing = false;
   bool isLoading = true;
-  bool _isSaving = false;
+  bool _isLoggingOut = false;
+  bool _isNavigating = false;
+  bool _isFollowAction = false;
 
   static const _orange = Color(0xFFFF7F00);
   static const _blue = Color(0xFF1556B5);
@@ -41,11 +49,25 @@ class _ProfilViewState extends State<ProfilView> {
 
   Future<void> _loadProfile() async {
     try {
-      final token = await AuthService.getToken("data");
-      final data = await UserService.fetchProfile(token ?? '');
+      final token = await AuthService.getToken();
+      late final Map<String, dynamic> data;
+
+      if (widget.userId != null) {
+        final user = await ApiService.fetchUserProfile(widget.userId!);
+        final followers = await ApiService.getFollowers(widget.userId!);
+        final following = await ApiService.getFollowing(widget.userId!);
+        followersCount = followers.length;
+        followingCount = following.length;
+        isFollowing = user.isFollowing;
+        data = user.toJson();
+      } else {
+        data = await UserService.fetchProfile(token ?? '');
+      }
+
       if (!mounted) return;
       setState(() {
-        fullnameCtrl.text = data['fullname'] ?? '';
+        profileData = data;
+        fullnameCtrl.text = data['fullname'] ?? data['name'] ?? '';
         emailCtrl.text = data['email'] ?? '';
         phoneCtrl.text = data['phone'] ?? '';
         isLoading = false;
@@ -53,40 +75,50 @@ class _ProfilViewState extends State<ProfilView> {
     } catch (e) {
       if (!mounted) return;
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur chargement profil: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Erreur chargement profil: $e')),
+        );
+      }
     }
   }
 
-  Future<void> _updateProfile() async {
-    setState(() => _isSaving = true);
+  Future<void> _logout() async {
+    setState(() => _isLoggingOut = true);
     try {
-      final token = await AuthService.getToken("data");
-      if (token == null) {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => LoginView()));
-        return;
-      }
-      final success = await UserService.updateProfile(
-        token: token,
-        name: fullnameCtrl.text,
-        email: emailCtrl.text,
-        phone: phoneCtrl.text,
-      );
+      await AuthService.logout();
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(success ? '✅ Profil mis à jour avec succès' : 'Erreur lors de la mise à jour'),
-        backgroundColor: success ? const Color(0xFF34C759) : Colors.red,
-        behavior: SnackBarBehavior.floating,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      ));
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur: $e'), backgroundColor: Colors.red),
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginView()),
+        (route) => false,
       );
     } finally {
-      if (mounted) setState(() => _isSaving = false);
+      if (mounted) setState(() => _isLoggingOut = false);
+    }
+  }
+
+  Future<void> _toggleFollow() async {
+    if (widget.userId == null) return;
+    setState(() => _isFollowAction = true);
+    try {
+      if (isFollowing) {
+        await ApiService.unfollowUser(widget.userId!);
+        setState(() {
+          isFollowing = false;
+          followersCount = (followersCount - 1).clamp(0, 999999);
+        });
+      } else {
+        await ApiService.followUser(widget.userId!);
+        setState(() {
+          isFollowing = true;
+          followersCount += 1;
+        });
+      }
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Erreur: $e')));
+    } finally {
+      if (mounted) setState(() => _isFollowAction = false);
     }
   }
 
@@ -113,16 +145,27 @@ class _ProfilViewState extends State<ProfilView> {
     );
   }
 
+  Widget _buildStatistic(String label, String value) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final initiale = fullnameCtrl.text.isNotEmpty
         ? fullnameCtrl.text[0].toUpperCase()
         : '?';
 
+    final ownProfile = widget.userId == null;
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: const Text('Mon Profil', style: TextStyle(fontWeight: FontWeight.w800, color: Colors.black87)),
+        title: Text(ownProfile ? 'Mon Profil' : 'Profil citoyen', style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.black87)),
         centerTitle: true,
         elevation: 0,
         backgroundColor: Colors.white,
@@ -168,7 +211,45 @@ class _ProfilViewState extends State<ProfilView> {
                       style: TextStyle(fontSize: 13, color: Colors.grey[500]),
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 10),
+                  if (profileData['bio'] != null && profileData['bio'].toString().isNotEmpty)
+                    Center(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 8),
+                        child: Text(
+                          profileData['bio'].toString(),
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 13, color: Colors.black54, height: 1.4),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 14),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildStatistic('Abonnés', followersCount.toString()),
+                      const SizedBox(width: 20),
+                      _buildStatistic('Abonnements', followingCount.toString()),
+                    ],
+                  ),
+                  if (!ownProfile) ...[
+                    const SizedBox(height: 14),
+                    SizedBox(
+                      height: 44,
+                      child: ElevatedButton(
+                        onPressed: _isFollowAction ? null : _toggleFollow,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isFollowing ? Colors.grey[200] : _blue,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: Text(
+                          isFollowing ? 'Se désabonner' : "S'abonner",
+                          style: TextStyle(color: isFollowing ? Colors.black87 : Colors.white, fontWeight: FontWeight.w700),
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 20),
 
                   // ── Section infos ──────────────────────────────────────
                   Container(
@@ -176,7 +257,7 @@ class _ProfilViewState extends State<ProfilView> {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 3))],
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3))],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -185,21 +266,24 @@ class _ProfilViewState extends State<ProfilView> {
                             style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15, color: Colors.black87)),
                         const SizedBox(height: 16),
 
-                        TextField(
+                        TextFormField(
                           controller: fullnameCtrl,
+                          readOnly: true,
                           decoration: _fieldDecoration('Nom complet', Icons.person_outline_rounded),
                         ),
                         const SizedBox(height: 12),
 
-                        TextField(
+                        TextFormField(
                           controller: emailCtrl,
+                          readOnly: true,
                           keyboardType: TextInputType.emailAddress,
                           decoration: _fieldDecoration('Adresse e-mail', Icons.mail_outline_rounded),
                         ),
                         const SizedBox(height: 12),
 
-                        TextField(
+                        TextFormField(
                           controller: phoneCtrl,
+                          readOnly: true,
                           keyboardType: TextInputType.phone,
                           decoration: _fieldDecoration('Téléphone', Icons.phone_outlined),
                         ),
@@ -208,32 +292,26 @@ class _ProfilViewState extends State<ProfilView> {
                   ),
                   const SizedBox(height: 20),
 
-                  // ── Bouton Enregistrer ─────────────────────────────────
+                  // ── Bouton Paramètres du compte ─────────────────────────
                   SizedBox(
                     height: 52,
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        color: _orange,
-                        borderRadius: BorderRadius.circular(14),
+                    child: ElevatedButton.icon(
+                      icon: const Icon(Icons.settings_rounded, color: Colors.white, size: 18),
+                      label: const Text('Paramètres du compte', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _blue,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        onPressed: _isSaving ? null : _updateProfile,
-                        child: _isSaving
-                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                            : const Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.save_rounded, color: Colors.white, size: 18),
-                                  SizedBox(width: 8),
-                                  Text('Enregistrer', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.w700)),
-                                ],
-                              ),
-                      ),
+                      onPressed: _isNavigating
+                          ? null
+                          : () async {
+                              setState(() => _isNavigating = true);
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const SettingsView()),
+                              );
+                              if (mounted) setState(() => _isNavigating = false);
+                            },
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -247,13 +325,7 @@ class _ProfilViewState extends State<ProfilView> {
                         backgroundColor: Colors.red.shade50,
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       ),
-                      onPressed: () {
-                        Navigator.pushAndRemoveUntil(
-                          context,
-                          MaterialPageRoute(builder: (_) => const LoginView()),
-                          (route) => false,
-                        );
-                      },
+                      onPressed: _isLoggingOut ? null : _logout,
                       icon: Icon(Icons.logout_rounded, color: Colors.red.shade400, size: 18),
                       label: Text('Déconnexion', style: TextStyle(color: Colors.red.shade400, fontSize: 16, fontWeight: FontWeight.w600)),
                     ),
@@ -272,7 +344,7 @@ class _ProfilViewState extends State<ProfilView> {
                             Container(
                               padding: const EdgeInsets.all(5),
                               decoration: BoxDecoration(
-                                color: _orange.withOpacity(0.1),
+                                color: _orange.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Image.asset('assets/logo_MEC_1.png', height: 16, width: 16),
