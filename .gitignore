@@ -43,7 +43,7 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
-
+/android/.kotlin/
 
 # Keystore - ne jamais commit ces fichiers
 android/key.properties
