@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import '../features/onboarding/onboarding_service.dart';
+import '../features/onboarding/onboarding_view.dart';
 import '../services/auth_service.dart';
 import 'accueil.dart';
 import 'login.dart';
@@ -31,12 +33,14 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _fadeAnim = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
-    _scaleAnim = Tween<double>(begin: 0.75, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut),
-    );
-    _slideAnim = Tween<double>(begin: 30, end: 0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
-    );
+    _scaleAnim = Tween<double>(
+      begin: 0.75,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
+    _slideAnim = Tween<double>(
+      begin: 30,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
 
     _ctrl.forward();
 
@@ -44,10 +48,36 @@ class _SplashScreenState extends State<SplashScreen>
       if (!mounted) return;
       final authenticated = await AuthService.isAuthenticated();
       if (!mounted) return;
+
+      if (authenticated) {
+        final shouldShowOnboarding =
+            await OnboardingService.shouldShowOnboarding();
+        if (!mounted) return;
+        if (shouldShowOnboarding) {
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              pageBuilder: (_, __, ___) => const OnboardingView(),
+              transitionsBuilder: (_, animation, __, child) =>
+                  FadeTransition(opacity: animation, child: child),
+              transitionDuration: const Duration(milliseconds: 800),
+            ),
+          );
+          return;
+        }
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => const Home(),
+            transitionsBuilder: (_, animation, __, child) =>
+                FadeTransition(opacity: animation, child: child),
+            transitionDuration: const Duration(milliseconds: 800),
+          ),
+        );
+        return;
+      }
+
       Navigator.of(context).pushReplacement(
         PageRouteBuilder(
-          pageBuilder: (_, __, ___) =>
-              authenticated ? const Home() : const LoginView(),
+          pageBuilder: (_, __, ___) => const LoginView(),
           transitionsBuilder: (_, animation, __, child) =>
               FadeTransition(opacity: animation, child: child),
           transitionDuration: const Duration(milliseconds: 800),
@@ -64,7 +94,6 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
@@ -127,10 +156,7 @@ class _SplashScreenState extends State<SplashScreen>
                 animation: _ctrl,
                 builder: (_, child) => Transform.translate(
                   offset: Offset(0, _slideAnim.value),
-                  child: Transform.scale(
-                    scale: _scaleAnim.value,
-                    child: child,
-                  ),
+                  child: Transform.scale(scale: _scaleAnim.value, child: child),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -164,7 +190,7 @@ class _SplashScreenState extends State<SplashScreen>
                     const SizedBox(height: 28),
 
                     // ── Nom de l'app ───────────────────────────────────
-                    const Text(
+                    /*  const Text(
                       'Citoyen +',
                       style: TextStyle(
                         fontSize: 32,
@@ -172,7 +198,7 @@ class _SplashScreenState extends State<SplashScreen>
                         color: _orange,
                         letterSpacing: -0.5,
                       ),
-                    ),
+                    ), */
                     const SizedBox(height: 8),
                     Text(
                       'Ton espace citoyen en Côte d\'Ivoire 🇨🇮',

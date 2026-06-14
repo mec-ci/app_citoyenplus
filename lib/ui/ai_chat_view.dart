@@ -3,7 +3,16 @@ import 'entete.dart';
 import '../services/ai_chat_service.dart';
 
 class AiChatView extends StatefulWidget {
-  const AiChatView({super.key});
+  final VoidCallback? onNotificationPressed;
+  final VoidCallback? onSearchPressed;
+  final VoidCallback? onProfilePressed;
+
+  const AiChatView({
+    super.key,
+    this.onNotificationPressed,
+    this.onSearchPressed,
+    this.onProfilePressed,
+  });
 
   @override
   State<AiChatView> createState() => AiChatViewState();
@@ -108,7 +117,12 @@ class AiChatViewState extends State<AiChatView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: const EntetePersonalise(),
+      appBar: EntetePersonalise(
+        title: 'Agent IA',
+        onNotificationPressed: widget.onNotificationPressed,
+        onSearchPressed: widget.onSearchPressed,
+        onProfilePressed: widget.onProfilePressed,
+      ),
       backgroundColor: Colors.grey[100],
       body: Column(
         children: [
@@ -152,15 +166,12 @@ class AiChatViewState extends State<AiChatView> {
                               end: Alignment.bottomRight,
                             )
                           : isError
-                              ? const LinearGradient(
-                                  colors: [
-                                    Color(0xFFFFEDED),
-                                    Color(0xFFFFEDED)
-                                  ],
-                                )
-                              : const LinearGradient(
-                                  colors: [Colors.white, Colors.white],
-                                ),
+                          ? const LinearGradient(
+                              colors: [Color(0xFFFFEDED), Color(0xFFFFEDED)],
+                            )
+                          : const LinearGradient(
+                              colors: [Colors.white, Colors.white],
+                            ),
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(18),
                         topRight: const Radius.circular(18),
@@ -181,8 +192,8 @@ class AiChatViewState extends State<AiChatView> {
                         color: isUser
                             ? Colors.white
                             : isError
-                                ? Colors.red[700]
-                                : Colors.black87,
+                            ? Colors.red[700]
+                            : Colors.black87,
                         fontFamily: 'Georgia',
                         fontSize: 15,
                         height: 1.4,
@@ -245,7 +256,8 @@ class AiChatViewState extends State<AiChatView> {
                         shape: BoxShape.circle,
                         gradient: _isLoading
                             ? const LinearGradient(
-                                colors: [Colors.grey, Colors.grey])
+                                colors: [Colors.grey, Colors.grey],
+                              )
                             : LinearGradient(
                                 colors: [mecOrange, mecBlue],
                                 begin: Alignment.topLeft,
@@ -312,18 +324,14 @@ class _TypingIndicatorState extends State<_TypingIndicator>
           bottomRight: Radius.circular(18),
         ),
         boxShadow: const [
-          BoxShadow(color: Colors.black12, blurRadius: 3, offset: Offset(0, 2))
+          BoxShadow(color: Colors.black12, blurRadius: 3, offset: Offset(0, 2)),
         ],
       ),
       child: FadeTransition(
         opacity: _anim,
         child: const Text(
           '● ● ●',
-          style: TextStyle(
-            color: Colors.grey,
-            fontSize: 13,
-            letterSpacing: 3,
-          ),
+          style: TextStyle(color: Colors.grey, fontSize: 13, letterSpacing: 3),
         ),
       ),
     );
