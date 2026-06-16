@@ -15,25 +15,25 @@ class ApiService {
   static const String baseUrl = ApiConfig.baseUrl;
 
   static Map<String, String> headers(String token) => {
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      };
+    'Accept': 'application/json',
+    'Authorization': 'Bearer $token',
+  };
 
   // GET ACTUALITE
   static Future<List<PostModel>> fetchPosts(String token) async {
-    final response = await AuthService.authorizedGet(Uri.parse('$baseUrl/actualites'));
-
+    final response = await AuthService.authorizedGet(
+      Uri.parse('$baseUrl/actualites'),
+    );
     final data = jsonDecode(response.body);
     final posts = data is Map<String, dynamic> ? data['data'] : data;
-
-    return (posts as List)
-        .map((e) => PostModel.fromJson(e))
-        .toList();
+    return (posts as List).map((e) => PostModel.fromJson(e)).toList();
   }
 
   // GET SIGNALEMENTS
   static Future<List<SignalementModel>> fetchSignalements(String token) async {
-    final response = await AuthService.authorizedGet(Uri.parse('$baseUrl/signalement-citoyen'));
+    final response = await AuthService.authorizedGet(
+      Uri.parse('$baseUrl/signalement-citoyen'),
+    );
 
     final data = jsonDecode(response.body);
     final signalements = data is Map<String, dynamic> ? data['data'] : data;
@@ -43,8 +43,13 @@ class ApiService {
         .toList();
   }
 
-  static Future<List<Map<String, dynamic>>> fetchLibraryDocuments(String id, String token) async {
-    final url = Uri.parse('$baseUrl/librairie/public/$id?sort=created_at&order=desc');
+  static Future<List<Map<String, dynamic>>> fetchLibraryDocuments(
+    String id,
+    String token,
+  ) async {
+    final url = Uri.parse(
+      '$baseUrl/librairie/public/$id?sort=created_at&order=desc',
+    );
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
@@ -61,18 +66,24 @@ class ApiService {
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final categories = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final categories = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return (categories as List).map((item) => item.toString()).toList();
     }
     throw Exception('Erreur lors de la récupération des catégories');
   }
 
-  static Future<List<Map<String, dynamic>>> fetchQuizCategories(String token) async {
+  static Future<List<Map<String, dynamic>>> fetchQuizCategories(
+    String token,
+  ) async {
     final url = Uri.parse('$baseUrl/quizz/categories');
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final categories = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final categories = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return (categories as List)
           .map((item) => item as Map<String, dynamic>)
           .toList();
@@ -85,7 +96,9 @@ class ApiService {
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final quizzes = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final quizzes = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return (quizzes as List)
           .map((item) => item as Map<String, dynamic>)
           .toList();
@@ -93,12 +106,16 @@ class ApiService {
     throw Exception('Erreur lors de la récupération des quizz');
   }
 
-  static Future<List<Map<String, dynamic>>> fetchNotifications(String token) async {
-    final url = Uri.parse('$baseUrl/notifications');
+  static Future<List<Map<String, dynamic>>> fetchNotifications(
+    String token,
+  ) async {
+    final url = Uri.parse('$baseUrl/notification');
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final notifications = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final notifications = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return (notifications as List)
           .map((item) => item as Map<String, dynamic>)
           .toList();
@@ -111,7 +128,9 @@ class ApiService {
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final messages = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final messages = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return (messages as List)
           .map((item) => item as Map<String, dynamic>)
           .toList();
@@ -142,10 +161,9 @@ class ApiService {
           );
           request.files.add(multipartFile);
         } else {
-          request.files.add(await http.MultipartFile.fromPath(
-            'image',
-            image.path,
-          ));
+          request.files.add(
+            await http.MultipartFile.fromPath('image', image.path),
+          );
         }
       }
 
@@ -178,10 +196,9 @@ class ApiService {
           );
           request.files.add(multipartFile);
         } else {
-          request.files.add(await http.MultipartFile.fromPath(
-            'image',
-            image.path,
-          ));
+          request.files.add(
+            await http.MultipartFile.fromPath('image', image.path),
+          );
         }
       }
 
@@ -192,7 +209,9 @@ class ApiService {
   }
 
   // 🔹 Récupérer les signalements
-  static Future<List<SignalementModel>> fetchAllSignalements(String token) async {
+  static Future<List<SignalementModel>> fetchAllSignalements(
+    String token,
+  ) async {
     final url = Uri.parse('$baseUrl/signalement-citoyen');
 
     final response = await AuthService.authorizedGet(url);
@@ -220,14 +239,18 @@ class ApiService {
       'limit': limit.toString(),
       if (cursor != null) 'cursor': cursor,
     };
-    final url = Uri.parse('$baseUrl/publications').replace(queryParameters: params);
-    
+    final url = Uri.parse(
+      '$baseUrl/publications',
+    ).replace(queryParameters: params);
+
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final publications = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final publications = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       final nextCursor = decoded is Map ? decoded['next_cursor'] : null;
-      
+
       return {
         'publications': (publications as List)
             .map((e) => Publication.fromJson(e as Map<String, dynamic>))
@@ -247,14 +270,18 @@ class ApiService {
       'limit': limit.toString(),
       if (cursor != null) 'cursor': cursor,
     };
-    final url = Uri.parse('$baseUrl/publications/abonnements').replace(queryParameters: params);
-    
+    final url = Uri.parse(
+      '$baseUrl/publications/abonnements',
+    ).replace(queryParameters: params);
+
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final publications = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final publications = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       final nextCursor = decoded is Map ? decoded['next_cursor'] : null;
-      
+
       return {
         'publications': (publications as List)
             .map((e) => Publication.fromJson(e as Map<String, dynamic>))
@@ -275,31 +302,32 @@ class ApiService {
     List<XFile>? images,
   }) async {
     final uri = Uri.parse('$baseUrl/publications');
-    
+
     final response = await AuthService.authorizedMultipartRequest(() async {
       final request = http.MultipartRequest('POST', uri)
         ..fields['type'] = type
         ..fields['texte'] = texte;
-      
+
       if (categorie != null) request.fields['categorie'] = categorie;
       if (localisation != null) request.fields['localisation'] = localisation;
       if (statut != null) request.fields['statut'] = statut;
-      
+
       if (images != null && images.isNotEmpty) {
         for (int i = 0; i < images.length; i++) {
           final image = images[i];
           if (kIsWeb) {
             final bytes = await image.readAsBytes();
-            request.files.add(http.MultipartFile.fromBytes(
-              'images',
-              bytes,
-              filename: image.name,
-            ));
+            request.files.add(
+              http.MultipartFile.fromBytes(
+                'images',
+                bytes,
+                filename: image.name,
+              ),
+            );
           } else {
-            request.files.add(await http.MultipartFile.fromPath(
-              'images',
-              image.path,
-            ));
+            request.files.add(
+              await http.MultipartFile.fromPath('images', image.path),
+            );
           }
         }
       }
@@ -308,7 +336,9 @@ class ApiService {
 
     if (response.statusCode == 201 || response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final pubData = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final pubData = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return Publication.fromJson(pubData);
     }
     throw Exception('Erreur lors de la création de la publication');
@@ -317,14 +347,19 @@ class ApiService {
   // ===== COMMENTS =====
 
   /// Fetch comments for a publication
-  static Future<List<Commentaire>> fetchPublicationComments(String publicationId) async {
-    final url = Uri.parse('$baseUrl/publications/$publicationId/commentaires')
-        .replace(queryParameters: {'sort': 'created_at', 'order': 'asc'});
-    
+  static Future<List<Commentaire>> fetchPublicationComments(
+    String publicationId,
+  ) async {
+    final url = Uri.parse(
+      '$baseUrl/publications/$publicationId/commentaires',
+    ).replace(queryParameters: {'sort': 'created_at', 'order': 'asc'});
+
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final comments = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final comments = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return (comments as List)
           .map((e) => Commentaire.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -338,7 +373,7 @@ class ApiService {
     required String texte,
   }) async {
     final url = Uri.parse('$baseUrl/publications/$publicationId/commentaires');
-    
+
     final response = await AuthService.authorizedPost(
       url,
       body: jsonEncode({'texte': texte}),
@@ -346,16 +381,23 @@ class ApiService {
 
     if (response.statusCode == 201 || response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final commentData = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final commentData = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return Commentaire.fromJson(commentData);
     }
     throw Exception('Erreur lors de la création du commentaire');
   }
 
   /// Delete a comment
-  static Future<bool> deleteComment(String publicationId, String commentId) async {
-    final url = Uri.parse('$baseUrl/publications/$publicationId/commentaires/$commentId');
-    
+  static Future<bool> deleteComment(
+    String publicationId,
+    String commentId,
+  ) async {
+    final url = Uri.parse(
+      '$baseUrl/publications/$publicationId/commentaires/$commentId',
+    );
+
     final response = await AuthService.authorizedDelete(url);
     return response.statusCode == 200 || response.statusCode == 204;
   }
@@ -365,22 +407,24 @@ class ApiService {
   /// Toggle like on a publication (POST to like, DELETE to unlike)
   static Future<bool> toggleLike(String publicationId) async {
     final url = Uri.parse('$baseUrl/publications/$publicationId/likes');
-    
+
     // First try to like (POST)
     var response = await AuthService.authorizedPost(url, body: jsonEncode({}));
-    
+
     if (response.statusCode == 409) {
       // Already liked, so unlike (DELETE)
       response = await AuthService.authorizedDelete(url);
     }
-    
-    return response.statusCode == 200 || response.statusCode == 201 || response.statusCode == 204;
+
+    return response.statusCode == 200 ||
+        response.statusCode == 201 ||
+        response.statusCode == 204;
   }
 
   /// Get like count for a publication
   static Future<int> getLikeCount(String publicationId) async {
     final url = Uri.parse('$baseUrl/publications/$publicationId/likes');
-    
+
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
@@ -399,11 +443,13 @@ class ApiService {
   /// Fetch a user's profile
   static Future<UtilisateurProfile> fetchUserProfile(String userId) async {
     final url = Uri.parse('$baseUrl/users/$userId');
-    
+
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final userData = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final userData = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return UtilisateurProfile.fromJson(userData);
     }
     throw Exception('Erreur lors du chargement du profil');
@@ -411,17 +457,17 @@ class ApiService {
 
   /// Get publications by a specific user
   static Future<List<Publication>> fetchUserPublications(String userId) async {
-    final params = {
-      'userId': userId,
-      'sort': 'created_at',
-      'order': 'desc',
-    };
-    final url = Uri.parse('$baseUrl/publications').replace(queryParameters: params);
-    
+    final params = {'userId': userId, 'sort': 'created_at', 'order': 'desc'};
+    final url = Uri.parse(
+      '$baseUrl/publications',
+    ).replace(queryParameters: params);
+
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final publications = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final publications = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return (publications as List)
           .map((e) => Publication.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -434,15 +480,18 @@ class ApiService {
   /// Follow a user
   static Future<bool> followUser(String targetUserId) async {
     final url = Uri.parse('$baseUrl/users/$targetUserId/follow');
-    
-    final response = await AuthService.authorizedPost(url, body: jsonEncode({}));
+
+    final response = await AuthService.authorizedPost(
+      url,
+      body: jsonEncode({}),
+    );
     return response.statusCode == 200 || response.statusCode == 201;
   }
 
   /// Unfollow a user
   static Future<bool> unfollowUser(String targetUserId) async {
     final url = Uri.parse('$baseUrl/users/$targetUserId/follow');
-    
+
     final response = await AuthService.authorizedDelete(url);
     return response.statusCode == 200 || response.statusCode == 204;
   }
@@ -450,11 +499,13 @@ class ApiService {
   /// Get followers list
   static Future<List<UtilisateurProfile>> getFollowers(String userId) async {
     final url = Uri.parse('$baseUrl/users/$userId/followers');
-    
+
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final followers = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final followers = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return (followers as List)
           .map((e) => UtilisateurProfile.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -465,11 +516,13 @@ class ApiService {
   /// Get following list
   static Future<List<UtilisateurProfile>> getFollowing(String userId) async {
     final url = Uri.parse('$baseUrl/users/$userId/following');
-    
+
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final following = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final following = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return (following as List)
           .map((e) => UtilisateurProfile.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -482,11 +535,13 @@ class ApiService {
   /// Get all conversations for current user
   static Future<List<Conversation>> getConversations() async {
     final url = Uri.parse('$baseUrl/messages/conversations');
-    
+
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final conversations = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final conversations = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return (conversations as List)
           .map((e) => Conversation.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -495,14 +550,21 @@ class ApiService {
   }
 
   /// Get messages in a conversation
-  static Future<List<Message>> getMessages(String conversationId, {int limit = 30}) async {
+  static Future<List<Message>> getMessages(
+    String conversationId, {
+    int limit = 30,
+  }) async {
     final params = {'limit': limit.toString()};
-    final url = Uri.parse('$baseUrl/messages/$conversationId').replace(queryParameters: params);
-    
+    final url = Uri.parse(
+      '$baseUrl/messages/$conversationId',
+    ).replace(queryParameters: params);
+
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final messages = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final messages = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return (messages as List)
           .map((e) => Message.fromJson(e as Map<String, dynamic>))
           .toList();
@@ -516,7 +578,7 @@ class ApiService {
     required String texte,
   }) async {
     final url = Uri.parse('$baseUrl/messages/$conversationId');
-    
+
     final response = await AuthService.authorizedPost(
       url,
       body: jsonEncode({'texte': texte}),
@@ -524,7 +586,9 @@ class ApiService {
 
     if (response.statusCode == 201 || response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final messageData = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
+      final messageData = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
       return Message.fromJson(messageData);
     }
     throw Exception('Erreur lors de l\'envoi du message');
@@ -534,16 +598,13 @@ class ApiService {
 
   /// Search for users and publications
   static Future<Map<String, dynamic>> search(String query) async {
-    final params = {
-      'q': query,
-      'type': 'users,publications',
-    };
+    final params = {'q': query, 'type': 'users,publications'};
     final url = Uri.parse('$baseUrl/search').replace(queryParameters: params);
-    
+
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      
+
       return {
         'users': (decoded['users'] as List? ?? [])
             .map((e) => UtilisateurProfile.fromJson(e as Map<String, dynamic>))
@@ -561,14 +622,14 @@ class ApiService {
   /// Get trending topics/hashtags
   static Future<List<Map<String, dynamic>>> getTrends() async {
     final url = Uri.parse('$baseUrl/trends');
-    
+
     final response = await AuthService.authorizedGet(url);
     if (response.statusCode == 200) {
       final decoded = jsonDecode(response.body);
-      final trends = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
-      return (trends as List)
-          .map((e) => e as Map<String, dynamic>)
-          .toList();
+      final trends = decoded is Map<String, dynamic>
+          ? decoded['data']
+          : decoded;
+      return (trends as List).map((e) => e as Map<String, dynamic>).toList();
     }
     throw Exception('Erreur lors du chargement des tendances');
   }
@@ -582,15 +643,13 @@ class ApiService {
     String? details,
   }) async {
     final url = Uri.parse('$baseUrl/publications/$publicationId/report');
-    
-    final body = {
-      'reason': reason,
-      if (details != null) 'details': details,
-    };
-    
-    final response = await AuthService.authorizedPost(url, body: jsonEncode(body));
+
+    final body = {'reason': reason, if (details != null) 'details': details};
+
+    final response = await AuthService.authorizedPost(
+      url,
+      body: jsonEncode(body),
+    );
     return response.statusCode == 200 || response.statusCode == 201;
   }
 }
-
-

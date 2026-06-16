@@ -1,15 +1,19 @@
 import 'dart:convert';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../config/api_config.dart';
 
 class AuthService {
   static const String baseUrl = ApiConfig.baseUrl;
-  static final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  static final FlutterSecureStorage _secureStorage =
+      const FlutterSecureStorage();
 
   static const String _accessTokenKey = 'accessToken';
   static const String _refreshTokenKey = 'refreshToken';
+  static const String _refreshTokenVerifiedKey = 'refreshTokenVerified';
 
   // INSCRIPTION
   static Future<Map<String, dynamic>> signup({
@@ -35,11 +39,13 @@ class AuthService {
         }),
       );
 
-      if (!response.headers['content-type']!.contains('application/json')) {
-        return {"success": false, "message": "Réponse invalide du serveur"};
+      final contentType = response.headers['content-type'] ?? '';
+      dynamic data;
+      if (contentType.contains('application/json')) {
+        data = jsonDecode(response.body);
+      } else {
+        data = response.body;
       }
-
-      final data = jsonDecode(response.body);
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         // Sauvegarde du token si existant
@@ -48,19 +54,38 @@ class AuthService {
         }
         if (data['refreshToken'] != null) {
           await saveRefreshToken(data['refreshToken']);
+          await setRefreshTokenVerified(false);
         }
 
         return {"success": true, "data": data};
       } else {
-        dynamic message = data["message"];
+        dynamic message;
+        if (data is Map) {
+          message = data["message"] ?? data["error"] ?? data["errors"];
+        } else {
+          message = data;
+        }
 
-        // Si le message est une liste, on prend le premier élément
         if (message is List && message.isNotEmpty) {
           message = message.join("\n");
         }
+        if (message is Map && message.isNotEmpty) {
+          message = message.values.map((item) => item.toString()).join("\n");
+        }
 
-        // Si ce n'est pas une String
-        if (message is! String) {
+        if (message is String) {
+          final lower = message.toLowerCase();
+          if (lower.contains('email') &&
+              (lower.contains('existe') ||
+                  lower.contains('déjà') ||
+                  lower.contains('already exists') ||
+                  lower.contains('duplicate') ||
+                  lower.contains('exists'))) {
+            message = 'Cet email est déjà enregistré.';
+          }
+        }
+
+        if (message is! String || message.trim().isEmpty) {
           message = "Erreur lors de l'inscription";
         }
 
@@ -132,13 +157,24 @@ class AuthService {
   static Future<void> clearTokens() async {
     await _secureStorage.delete(key: _accessTokenKey);
     await _secureStorage.delete(key: _refreshTokenKey);
+    await setRefreshTokenVerified(false);
   }
 
-  static Future<Map<String, String>> _authHeaders([Map<String, String>? extra]) async {
+  static Future<void> setRefreshTokenVerified(bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_refreshTokenVerifiedKey, value);
+  }
+
+  static Future<bool> isRefreshTokenVerified() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_refreshTokenVerifiedKey) ?? false;
+  }
+
+  static Future<Map<String, String>> _authHeaders([
+    Map<String, String>? extra,
+  ]) async {
     final token = await getToken();
-    final headers = <String, String>{
-      'Accept': 'application/json',
-    };
+    final headers = <String, String>{'Accept': 'application/json'};
     if (token != null) {
       headers['Authorization'] = 'Bearer $token';
     }
@@ -162,27 +198,55 @@ class AuthService {
   }
 
   static Future<http.Response> authorizedGet(
-    Uri url, {
-    Map<String, String>? extraHeaders,
-  }) async {
+      Uri url, {
+        Map<String, String>? extraHeaders,
+      }) async {
     return _authenticatedRequest(() async {
-      return http.get(url, headers: await _authHeaders(extraHeaders));
+      final headers = await _authHeaders(extraHeaders);
+
+      debugPrint('\n================ GET =================');
+      debugPrint('URL: $url');
+      debugPrint('HEADERS: $headers');
+
+      final response = await http.get(
+        url,
+        headers: headers,
+      );
+
+      debugPrint('STATUS: ${response.statusCode}');
+      debugPrint('BODY: ${response.body}');
+      debugPrint('======================================\n');
+
+      return response;
     });
   }
 
   static Future<http.Response> authorizedPost(
-    Uri url, {
-    Map<String, String>? extraHeaders,
-    Object? body,
-    Encoding? encoding,
-  }) async {
+      Uri url, {
+        Map<String, String>? extraHeaders,
+        Object? body,
+        Encoding? encoding,
+      }) async {
     return _authenticatedRequest(() async {
-      return http.post(
+      final headers = await _authHeaders(extraHeaders);
+
+      debugPrint('\n================ POST =================');
+      debugPrint('URL: $url');
+      debugPrint('HEADERS: $headers');
+      debugPrint('REQUEST BODY: $body');
+
+      final response = await http.post(
         url,
-        headers: await _authHeaders(extraHeaders),
+        headers: headers,
         body: body,
         encoding: encoding,
       );
+
+      debugPrint('STATUS: ${response.statusCode}');
+      debugPrint('RESPONSE BODY: ${response.body}');
+      debugPrint('=======================================\n');
+
+      return response;
     });
   }
 
@@ -266,7 +330,21 @@ class AuthService {
   static Future<bool> isAuthenticated() async {
     final valid = await verifyToken();
     if (valid) return true;
+    if (!await isRefreshTokenVerified()) return false;
     return await refreshToken();
+  }
+
+  static Future<Map<String, dynamic>> registerWithGoogle({
+    required String name,
+    required String email,
+  }) async {
+    final password = 'GoogleAuth!${DateTime.now().millisecondsSinceEpoch}';
+    return await signup(
+      name: name,
+      email: email,
+      phone: '',
+      password: password,
+    );
   }
 
   static Future<bool> refreshToken() async {
@@ -323,7 +401,10 @@ class AuthService {
     final idToken = auth.idToken;
     final accessToken = auth.accessToken;
     if (idToken == null || accessToken == null) {
-      return {'success': false, 'message': 'Impossible de récupérer les jetons Google'};
+      return {
+        'success': false,
+        'message': 'Impossible de récupérer les jetons Google',
+      };
     }
 
     final url = Uri.parse('$baseUrl/auth/google');
@@ -334,10 +415,7 @@ class AuthService {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: jsonEncode({
-          'idToken': idToken,
-          'accessToken': accessToken,
-        }),
+        body: jsonEncode({'idToken': idToken, 'accessToken': accessToken}),
       );
       final data = jsonDecode(response.body);
       if (response.statusCode == 200 || response.statusCode == 201) {
@@ -349,6 +427,17 @@ class AuthService {
         }
         return {'success': true, 'data': data};
       }
+
+      if (account.email.isNotEmpty) {
+        final registerResult = await registerWithGoogle(
+          name: account.displayName ?? 'Utilisateur Google',
+          email: account.email,
+        );
+        if (registerResult['success']) {
+          return await loginWithGoogle();
+        }
+      }
+
       return {
         'success': false,
         'message': data['message'] ?? 'Erreur de connexion Google',
@@ -359,6 +448,68 @@ class AuthService {
   }
 
   // MOT DE PASSE OUBLIÉ
+  static Future<Map<String, dynamic>> verifyRefreshToken({
+    required String refreshToken,
+  }) async {
+    final url = Uri.parse('$baseUrl/auth/refresh-token');
+
+    try {
+      final response = await http.post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({'refreshToken': refreshToken}),
+      );
+
+      final contentType = response.headers['content-type'] ?? '';
+      dynamic data;
+      if (contentType.contains('application/json')) {
+        data = jsonDecode(response.body);
+      } else {
+        data = response.body;
+      }
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        if (data is Map) {
+          if (data['token'] != null) {
+            await saveToken(data['token']);
+          }
+          if (data['refreshToken'] != null) {
+            await saveRefreshToken(data['refreshToken']);
+          }
+        }
+        await setRefreshTokenVerified(true);
+        return {'success': true, 'data': data};
+      }
+
+      dynamic message = 'Token invalide';
+      if (data is Map) {
+        message = data['message'] ?? data['error'] ?? data['errors'] ?? message;
+      } else if (data is String && data.isNotEmpty) {
+        message = data;
+      }
+
+      if (message is List && message.isNotEmpty) {
+        message = message.join('\n');
+      }
+      if (message is Map && message.isNotEmpty) {
+        message = message.values.map((item) => item.toString()).join('\n');
+      }
+      if (message is! String || message.trim().isEmpty) {
+        message = 'Token invalide';
+      }
+
+      return {'success': false, 'message': message};
+    } catch (e) {
+      return {
+        'success': false,
+        'message': 'Impossible de vérifier le token : ${e.toString()}',
+      };
+    }
+  }
+
   static Future<Map<String, dynamic>> forgotPassword({
     required String email,
   }) async {
@@ -384,7 +535,8 @@ class AuthService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return {
           "success": true,
-          "message": data["message"] ?? "Un email de réinitialisation a été envoyé.",
+          "message":
+              data["message"] ?? "Un email de réinitialisation a été envoyé.",
         };
       } else {
         dynamic message = data["message"];
@@ -393,7 +545,10 @@ class AuthService {
         return {"success": false, "message": message};
       }
     } catch (_) {
-      return {"success": false, "message": "Erreur réseau, réessaie encore 🙏🏾"};
+      return {
+        "success": false,
+        "message": "Erreur réseau, réessaie encore 🙏🏾",
+      };
     }
   }
 
