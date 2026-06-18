@@ -1,655 +1,427 @@
-import 'dart:convert';
-import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
-import '../config/api_config.dart';
+import '../core/network/dio_client.dart';
+import '../core/network/api_endpoints.dart';
 import '../models/post.dart';
 import '../models/signalement.dart';
-import '../models/publication.dart';
-import '../models/commentaire.dart';
-import '../models/message.dart';
-import '../models/utilisateur_profile.dart';
-import 'auth_service.dart';
 
 class ApiService {
-  static const String baseUrl = ApiConfig.baseUrl;
+  static final Dio _dio = DioClient.getInstance();
 
-  static Map<String, String> headers(String token) => {
-    'Accept': 'application/json',
-    'Authorization': 'Bearer $token',
-  };
-
-  // GET ACTUALITE
-  static Future<List<PostModel>> fetchPosts(String token) async {
-    final response = await AuthService.authorizedGet(
-      Uri.parse('$baseUrl/actualites'),
-    );
-    final data = jsonDecode(response.body);
-    final posts = data is Map<String, dynamic> ? data['data'] : data;
-    return (posts as List).map((e) => PostModel.fromJson(e)).toList();
+  // ── Points ─────────────────────────────────────────────────────────────────
+  static Future<bool> syncPoints(int amount) async {
+    try {
+      final response = await _dio.post('/users/points', data: {
+        'points': amount,
+      });
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
   }
 
-  // GET SIGNALEMENTS
-  static Future<List<SignalementModel>> fetchSignalements(String token) async {
-    final response = await AuthService.authorizedGet(
-      Uri.parse('$baseUrl/signalement-citoyen'),
+  // ── Quiz – Résultat ────────────────────────────────────────────────────────
+  static Future<bool> postQuizResult({
+    required String userId,
+    required String quizId,
+    required int score,
+    required int total,
+    required List<Map<String, dynamic>> answers,
+    required List<double> timePerQuestion,
+  }) async {
+    try {
+      final response = await _dio.post(ApiEndpoints.quizzSubmit, data: {
+        'userId': userId,
+        'quizId': quizId,
+        'score': score,
+        'total': total,
+        'answers': answers,
+        'timePerQuestion': timePerQuestion,
+      });
+      return response.statusCode == 200 || response.statusCode == 201;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  static Future<List<PostModel>> fetchPosts({int page = 1, int limit = 20}) async {
+    final response = await _dio.get(
+      ApiEndpoints.actualites,
+      queryParameters: {'page': page, 'limit': limit},
     );
+    final data = response.data;
+    final items = data is Map<String, dynamic> ? data['data'] ?? data : data;
+    return (items as List)
+        .map((e) => PostModel.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
 
-    final data = jsonDecode(response.body);
-    final signalements = data is Map<String, dynamic> ? data['data'] : data;
+  static Future<List<SignalementModel>> fetchSignalements({
+    int page = 1,
+    int limit = 20,
+    String? citoyenId,
+  }) async {
+    final query = <String, dynamic>{'page': page, 'limit': limit};
+    if (citoyenId != null) query['citoyenId'] = citoyenId;
 
-    return (signalements as List)
-        .map((e) => SignalementModel.fromJson(e))
+    final response = await _dio.get(
+      ApiEndpoints.signalementCitoyen,
+      queryParameters: query,
+    );
+    final data = response.data;
+    final items = data is Map<String, dynamic> ? data['data'] ?? data : data;
+    return (items as List)
+        .map((e) => SignalementModel.fromJson(e as Map<String, dynamic>))
         .toList();
   }
 
   static Future<List<Map<String, dynamic>>> fetchLibraryDocuments(
-    String id,
-    String token,
+    String? title,
   ) async {
-    final url = Uri.parse(
-      '$baseUrl/librairie/public/$id?sort=created_at&order=desc',
+    final query = <String, dynamic>{};
+    if (title != null) query['title'] = title;
+
+    final response = await _dio.get(
+      ApiEndpoints.librairiePublic,
+      queryParameters: query,
     );
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final docs = decoded is Map<String, dynamic> ? decoded['data'] : decoded;
-      return (docs as List)
-          .map((item) => item as Map<String, dynamic>)
-          .toList();
-    }
-    throw Exception('Erreur lors de la récupération des documents');
+    final data = response.data;
+    final docs = data is Map<String, dynamic> ? data['data'] ?? data : data;
+    return (docs as List)
+        .map((item) => item as Map<String, dynamic>)
+        .toList();
   }
 
-  static Future<List<String>> fetchCategories() async {
-    final url = Uri.parse('$baseUrl/categories');
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final categories = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return (categories as List).map((item) => item.toString()).toList();
-    }
-    throw Exception('Erreur lors de la récupération des catégories');
-  }
-
-  static Future<List<Map<String, dynamic>>> fetchQuizCategories(
-    String token,
-  ) async {
-    final url = Uri.parse('$baseUrl/quizz/categories');
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final categories = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
+  static Future<List<Map<String, dynamic>>> fetchQuizCategories() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.quizzCategories);
+      final data = response.data;
+      final categories = data is Map<String, dynamic> ? data['data'] ?? data : data;
       return (categories as List)
           .map((item) => item as Map<String, dynamic>)
           .toList();
+    } on DioException {
+      return _mockQuizCategories;
     }
-    throw Exception('Erreur lors de la récupération des catégories de quizz');
   }
 
-  static Future<List<Map<String, dynamic>>> fetchQuizzes(String token) async {
-    final url = Uri.parse('$baseUrl/quizz');
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final quizzes = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
+  static Future<List<Map<String, dynamic>>> fetchQuizzes() async {
+    try {
+      final response = await _dio.get(ApiEndpoints.quizz);
+      final data = response.data;
+      final quizzes = data is Map<String, dynamic> ? data['data'] ?? data : data;
       return (quizzes as List)
           .map((item) => item as Map<String, dynamic>)
           .toList();
+    } on DioException {
+      return _mockQuizzes;
     }
-    throw Exception('Erreur lors de la récupération des quizz');
   }
 
-  static Future<List<Map<String, dynamic>>> fetchNotifications(
-    String token,
-  ) async {
-    final url = Uri.parse('$baseUrl/notification');
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final notifications = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return (notifications as List)
-          .map((item) => item as Map<String, dynamic>)
-          .toList();
-    }
-    throw Exception('Erreur lors de la récupération des notifications');
+  // ── MOCK DATA ──────────────────────────────────────────────────────────────
+
+  static List<Map<String, dynamic>> get _mockQuizCategories => [
+    {
+      'id': 'mock_cat_1',
+      'titre': 'Constitution',
+      'description': 'Testez vos connaissances sur la Constitution ivoirienne',
+      'totalXp': 100,
+    },
+    {
+      'id': 'mock_cat_2',
+      'titre': 'Institutions',
+      'description': 'Les institutions de la République de Côte d\'Ivoire',
+      'totalXp': 80,
+    },
+    {
+      'id': 'mock_cat_3',
+      'titre': 'Histoire',
+      'description': 'L\'histoire de la Côte d\'Ivoire',
+      'totalXp': 100,
+    },
+  ];
+
+  static List<Map<String, dynamic>> get _mockQuizzes => [
+    {
+      'id': 'mock_quiz_1',
+      'title': 'Quiz Constitution',
+      'description': 'Testez vos connaissances sur la Constitution',
+      'difficulte': 'FACILE',
+      'categorieId': 'mock_cat_1',
+      'questions': [
+        {
+          'text': 'En quelle année la Constitution ivoirienne actuelle a-t-elle été adoptée ?',
+          'choices': [
+            {'text': '2000', 'isCorrect': false},
+            {'text': '2016', 'isCorrect': true},
+            {'text': '2010', 'isCorrect': false},
+            {'text': '1999', 'isCorrect': false},
+          ],
+        },
+        {
+          'text': 'Quel est le rôle du Conseil Constitutionnel ?',
+          'choices': [
+            {'text': 'Organiser les élections', 'isCorrect': false},
+            {'text': 'Veiller au respect de la Constitution', 'isCorrect': true},
+            {'text': 'Juger les criminels', 'isCorrect': false},
+            {'text': 'Préparer les lois', 'isCorrect': false},
+          ],
+        },
+        {
+          'text': 'Combien de titres comporte la Constitution de 2016 ?',
+          'choices': [
+            {'text': '12', 'isCorrect': false},
+            {'text': '14', 'isCorrect': true},
+            {'text': '10', 'isCorrect': false},
+            {'text': '16', 'isCorrect': false},
+          ],
+        },
+        {
+          'text': 'Qui est le garant de l\'indépendance de la justice ?',
+          'choices': [
+            {'text': 'Le Premier ministre', 'isCorrect': false},
+            {'text': 'Le Président de la République', 'isCorrect': true},
+            {'text': 'Le Conseil supérieur de la magistrature', 'isCorrect': false},
+            {'text': 'Le Garde des Sceaux', 'isCorrect': false},
+          ],
+        },
+        {
+          'text': 'La Constitution ivoirienne consacre le principe de :',
+          'choices': [
+            {'text': 'La monarchie', 'isCorrect': false},
+            {'text': 'La dictature', 'isCorrect': false},
+            {'text': 'La séparation des pouvoirs', 'isCorrect': true},
+            {'text': 'Le pouvoir absolu', 'isCorrect': false},
+          ],
+        },
+      ],
+    },
+    {
+      'id': 'mock_quiz_2',
+      'title': 'Quiz Institutions',
+      'description': 'Connaissez-vous les institutions ivoiriennes ?',
+      'difficulte': 'MOYEN',
+      'categorieId': 'mock_cat_2',
+      'questions': [
+        {
+          'text': 'Quel est le rôle de l\'Assemblée Nationale ?',
+          'choices': [
+            {'text': 'Faire les lois', 'isCorrect': true},
+            {'text': 'Juger les citoyens', 'isCorrect': false},
+            {'text': 'Organiser les élections', 'isCorrect': false},
+            {'text': 'Défendre le pays', 'isCorrect': false},
+          ],
+        },
+        {
+          'text': 'Qui nomme le Premier ministre en Côte d\'Ivoire ?',
+          'choices': [
+            {'text': 'Le Sénat', 'isCorrect': false},
+            {'text': 'Le Président de la République', 'isCorrect': true},
+            {'text': 'L\'Assemblée Nationale', 'isCorrect': false},
+            {'text': 'Le peuple', 'isCorrect': false},
+          ],
+        },
+        {
+          'text': 'Combien y a-t-il de pouvoirs dans l\'État ivoirien ?',
+          'choices': [
+            {'text': '2', 'isCorrect': false},
+            {'text': '3', 'isCorrect': true},
+            {'text': '4', 'isCorrect': false},
+            {'text': '5', 'isCorrect': false},
+          ],
+        },
+        {
+          'text': 'Quel est le mandat du Président de la République ?',
+          'choices': [
+            {'text': '4 ans', 'isCorrect': false},
+            {'text': '5 ans', 'isCorrect': true},
+            {'text': '6 ans', 'isCorrect': false},
+            {'text': '7 ans', 'isCorrect': false},
+          ],
+        },
+        {
+          'text': 'Quelle institution contrôle les finances publiques ?',
+          'choices': [
+            {'text': 'La Cour suprême', 'isCorrect': false},
+            {'text': 'La Cour des comptes', 'isCorrect': true},
+            {'text': 'Le Sénat', 'isCorrect': false},
+            {'text': 'La BCEAO', 'isCorrect': false},
+          ],
+        },
+      ],
+    },
+    {
+      'id': 'mock_quiz_3',
+      'title': 'Quiz Histoire',
+      'description': 'Testez votre connaissance de l\'histoire ivoirienne',
+      'difficulte': 'FACILE',
+      'categorieId': 'mock_cat_3',
+      'questions': [
+        {
+          'text': 'En quelle année la Côte d\'Ivoire a-t-elle obtenu son indépendance ?',
+          'choices': [
+            {'text': '1958', 'isCorrect': false},
+            {'text': '1960', 'isCorrect': true},
+            {'text': '1962', 'isCorrect': false},
+            {'text': '1970', 'isCorrect': false},
+          ],
+        },
+        {
+          'text': 'Qui fut le premier président de la Côte d\'Ivoire ?',
+          'choices': [
+            {'text': 'Alassane Ouattara', 'isCorrect': false},
+            {'text': 'Laurent Gbagbo', 'isCorrect': false},
+            {'text': 'Félix Houphouët-Boigny', 'isCorrect': true},
+            {'text': 'Henri Konan Bédié', 'isCorrect': false},
+          ],
+        },
+        {
+          'text': 'Quelle est la devise nationale de la Côte d\'Ivoire ?',
+          'choices': [
+            {'text': 'Travail – Famille – Patrie', 'isCorrect': false},
+            {'text': 'Union – Discipline – Travail', 'isCorrect': false},
+            {'text': 'Paix – Unité – Progrès', 'isCorrect': true},
+            {'text': 'Liberté – Égalité – Fraternité', 'isCorrect': false},
+          ],
+        },
+        {
+          'text': 'Quel événement majeur a eu lieu en Côte d\'Ivoire en 1999 ?',
+          'choices': [
+            {'text': 'L\'indépendance', 'isCorrect': false},
+            {'text': 'Le premier coup d\'État', 'isCorrect': true},
+            {'text': 'L\'élection présidentielle', 'isCorrect': false},
+            {'text': 'La CAN', 'isCorrect': false},
+          ],
+        },
+        {
+          'text': 'Quel surnom donne-t-on à Abidjan ?',
+          'choices': [
+            {'text': 'La ville lumière', 'isCorrect': false},
+            {'text': 'La perle des lagunes', 'isCorrect': true},
+            {'text': 'La capitale culturelle', 'isCorrect': false},
+            {'text': 'La cité du cacao', 'isCorrect': false},
+          ],
+        },
+      ],
+    },
+  ];
+
+  static Future<List<Map<String, dynamic>>> fetchNotifications() async {
+    final response = await _dio.get('/notifications');
+    final data = response.data;
+    final notifications = data is Map<String, dynamic> ? data['data'] ?? data : data;
+    return (notifications as List)
+        .map((item) => item as Map<String, dynamic>)
+        .toList();
   }
 
-  static Future<List<Map<String, dynamic>>> fetchMessages(String token) async {
-    final url = Uri.parse('$baseUrl/messages');
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final messages = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return (messages as List)
-          .map((item) => item as Map<String, dynamic>)
-          .toList();
-    }
-    throw Exception('Erreur lors de la récupération des messages');
-  }
-
-  // CREER ACTUALITE
   static Future<bool> createPost({
-    required String token,
     required String title,
     required String description,
+    required String excerpt,
     XFile? image,
   }) async {
-    final uri = Uri.parse('$baseUrl/actualites');
-    final response = await AuthService.authorizedMultipartRequest(() async {
-      final request = http.MultipartRequest('POST', uri)
-        ..fields['title'] = title
-        ..fields['description'] = description;
+    if (image != null) {
+      final formData = FormData.fromMap({
+        'title': title,
+        'description': description,
+        'excerpt': excerpt,
+        'imageUrl': await MultipartFile.fromFile(
+          image.path,
+          filename: image.name,
+        ),
+      });
+      final response = await _dio.post(
+        ApiEndpoints.actualites,
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      return response.statusCode == 201 || response.statusCode == 200;
+    }
 
-      if (image != null) {
-        if (kIsWeb) {
-          final bytes = await image.readAsBytes();
-          final multipartFile = http.MultipartFile.fromBytes(
-            'image',
-            bytes,
-            filename: image.name,
-          );
-          request.files.add(multipartFile);
-        } else {
-          request.files.add(
-            await http.MultipartFile.fromPath('image', image.path),
-          );
-        }
-      }
-
-      return request;
+    final response = await _dio.post(ApiEndpoints.actualites, data: {
+      'title': title,
+      'description': description,
+      'excerpt': excerpt,
     });
-
     return response.statusCode == 201 || response.statusCode == 200;
   }
 
-  // CREER SIGNALEMENT
-  static Future<bool> createSignalement({
-    required String token,
-    required String description,
-    required String categorieId,
-    XFile? image,
-  }) async {
-    final uri = Uri.parse('$baseUrl/signalement-citoyen');
-    final response = await AuthService.authorizedMultipartRequest(() async {
-      final request = http.MultipartRequest('POST', uri)
-        ..fields['description'] = description
-        ..fields['categorieId'] = categorieId;
-
-      if (image != null) {
-        if (kIsWeb) {
-          final bytes = await image.readAsBytes();
-          final multipartFile = http.MultipartFile.fromBytes(
-            'image',
-            bytes,
-            filename: image.name,
-          );
-          request.files.add(multipartFile);
-        } else {
-          request.files.add(
-            await http.MultipartFile.fromPath('image', image.path),
-          );
-        }
-      }
-
-      return request;
-    });
-
-    return response.statusCode == 201 || response.statusCode == 200;
+  static Future<List<Map<String, dynamic>>> getConversations() async {
+    final response = await _dio.get('/conversations');
+    final data = response.data;
+    final items = data is Map<String, dynamic> ? data['data'] ?? data : data;
+    return (items as List)
+        .map((item) => item as Map<String, dynamic>)
+        .toList();
   }
 
-  // 🔹 Récupérer les signalements
-  static Future<List<SignalementModel>> fetchAllSignalements(
-    String token,
+  static Future<List<Map<String, dynamic>>> getMessages(
+    String conversationId,
   ) async {
-    final url = Uri.parse('$baseUrl/signalement-citoyen');
-
-    final response = await AuthService.authorizedGet(url);
-
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
-      return data.map((e) => SignalementModel.fromJson(e)).toList();
-    } else {
-      throw Exception('Erreur chargement signalements');
-    }
+    final response = await _dio.get('/conversations/$conversationId/messages');
+    final data = response.data;
+    final items = data is Map<String, dynamic> ? data['data'] ?? data : data;
+    return (items as List)
+        .map((item) => item as Map<String, dynamic>)
+        .toList();
   }
 
-  // ===== FEED & SOCIAL FEATURES =====
-
-  /// Fetch paginated feed of publications (actualites + signalements)
-  /// [limit] default 10, [cursor] for pagination (datetime ISO string or null for first page)
-  static Future<Map<String, dynamic>> fetchPublications({
-    String? cursor,
-    int limit = 10,
-  }) async {
-    final params = {
-      'type': 'actualite,signalement',
-      'sort': 'created_at',
-      'order': 'desc',
-      'limit': limit.toString(),
-      if (cursor != null) 'cursor': cursor,
-    };
-    final url = Uri.parse(
-      '$baseUrl/publications',
-    ).replace(queryParameters: params);
-
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final publications = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      final nextCursor = decoded is Map ? decoded['next_cursor'] : null;
-
-      return {
-        'publications': (publications as List)
-            .map((e) => Publication.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        'nextCursor': nextCursor,
-      };
-    }
-    throw Exception('Erreur lors du chargement du feed');
-  }
-
-  /// Fetch subscription-based feed for a user
-  static Future<Map<String, dynamic>> fetchSubscriptionFeed({
-    String? cursor,
-    int limit = 10,
-  }) async {
-    final params = {
-      'limit': limit.toString(),
-      if (cursor != null) 'cursor': cursor,
-    };
-    final url = Uri.parse(
-      '$baseUrl/publications/abonnements',
-    ).replace(queryParameters: params);
-
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final publications = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      final nextCursor = decoded is Map ? decoded['next_cursor'] : null;
-
-      return {
-        'publications': (publications as List)
-            .map((e) => Publication.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        'nextCursor': nextCursor,
-      };
-    }
-    throw Exception('Erreur lors du chargement du feed abonnements');
-  }
-
-  /// Create a new publication (actualite or signalement)
-  static Future<Publication> createPublication({
-    required String type, // 'actualite' or 'signalement'
-    required String texte,
-    String? categorie,
-    String? localisation,
-    String? statut,
-    List<XFile>? images,
-  }) async {
-    final uri = Uri.parse('$baseUrl/publications');
-
-    final response = await AuthService.authorizedMultipartRequest(() async {
-      final request = http.MultipartRequest('POST', uri)
-        ..fields['type'] = type
-        ..fields['texte'] = texte;
-
-      if (categorie != null) request.fields['categorie'] = categorie;
-      if (localisation != null) request.fields['localisation'] = localisation;
-      if (statut != null) request.fields['statut'] = statut;
-
-      if (images != null && images.isNotEmpty) {
-        for (int i = 0; i < images.length; i++) {
-          final image = images[i];
-          if (kIsWeb) {
-            final bytes = await image.readAsBytes();
-            request.files.add(
-              http.MultipartFile.fromBytes(
-                'images',
-                bytes,
-                filename: image.name,
-              ),
-            );
-          } else {
-            request.files.add(
-              await http.MultipartFile.fromPath('images', image.path),
-            );
-          }
-        }
-      }
-      return request;
-    });
-
-    if (response.statusCode == 201 || response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final pubData = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return Publication.fromJson(pubData);
-    }
-    throw Exception('Erreur lors de la création de la publication');
-  }
-
-  // ===== COMMENTS =====
-
-  /// Fetch comments for a publication
-  static Future<List<Commentaire>> fetchPublicationComments(
-    String publicationId,
-  ) async {
-    final url = Uri.parse(
-      '$baseUrl/publications/$publicationId/commentaires',
-    ).replace(queryParameters: {'sort': 'created_at', 'order': 'asc'});
-
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final comments = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return (comments as List)
-          .map((e) => Commentaire.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
-    throw Exception('Erreur lors du chargement des commentaires');
-  }
-
-  /// Create a comment on a publication
-  static Future<Commentaire> createComment({
-    required String publicationId,
-    required String texte,
-  }) async {
-    final url = Uri.parse('$baseUrl/publications/$publicationId/commentaires');
-
-    final response = await AuthService.authorizedPost(
-      url,
-      body: jsonEncode({'texte': texte}),
-    );
-
-    if (response.statusCode == 201 || response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final commentData = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return Commentaire.fromJson(commentData);
-    }
-    throw Exception('Erreur lors de la création du commentaire');
-  }
-
-  /// Delete a comment
-  static Future<bool> deleteComment(
-    String publicationId,
-    String commentId,
-  ) async {
-    final url = Uri.parse(
-      '$baseUrl/publications/$publicationId/commentaires/$commentId',
-    );
-
-    final response = await AuthService.authorizedDelete(url);
-    return response.statusCode == 200 || response.statusCode == 204;
-  }
-
-  // ===== LIKES =====
-
-  /// Toggle like on a publication (POST to like, DELETE to unlike)
-  static Future<bool> toggleLike(String publicationId) async {
-    final url = Uri.parse('$baseUrl/publications/$publicationId/likes');
-
-    // First try to like (POST)
-    var response = await AuthService.authorizedPost(url, body: jsonEncode({}));
-
-    if (response.statusCode == 409) {
-      // Already liked, so unlike (DELETE)
-      response = await AuthService.authorizedDelete(url);
-    }
-
-    return response.statusCode == 200 ||
-        response.statusCode == 201 ||
-        response.statusCode == 204;
-  }
-
-  /// Get like count for a publication
-  static Future<int> getLikeCount(String publicationId) async {
-    final url = Uri.parse('$baseUrl/publications/$publicationId/likes');
-
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      if (decoded is Map<String, dynamic> && decoded.containsKey('count')) {
-        return decoded['count'] as int;
-      }
-      if (decoded is List) {
-        return decoded.length;
-      }
-    }
-    return 0;
-  }
-
-  // ===== USER PROFILES =====
-
-  /// Fetch a user's profile
-  static Future<UtilisateurProfile> fetchUserProfile(String userId) async {
-    final url = Uri.parse('$baseUrl/users/$userId');
-
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final userData = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return UtilisateurProfile.fromJson(userData);
-    }
-    throw Exception('Erreur lors du chargement du profil');
-  }
-
-  /// Get publications by a specific user
-  static Future<List<Publication>> fetchUserPublications(String userId) async {
-    final params = {'userId': userId, 'sort': 'created_at', 'order': 'desc'};
-    final url = Uri.parse(
-      '$baseUrl/publications',
-    ).replace(queryParameters: params);
-
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final publications = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return (publications as List)
-          .map((e) => Publication.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
-    throw Exception('Erreur lors du chargement des publications');
-  }
-
-  // ===== FOLLOW/UNFOLLOW =====
-
-  /// Follow a user
-  static Future<bool> followUser(String targetUserId) async {
-    final url = Uri.parse('$baseUrl/users/$targetUserId/follow');
-
-    final response = await AuthService.authorizedPost(
-      url,
-      body: jsonEncode({}),
-    );
-    return response.statusCode == 200 || response.statusCode == 201;
-  }
-
-  /// Unfollow a user
-  static Future<bool> unfollowUser(String targetUserId) async {
-    final url = Uri.parse('$baseUrl/users/$targetUserId/follow');
-
-    final response = await AuthService.authorizedDelete(url);
-    return response.statusCode == 200 || response.statusCode == 204;
-  }
-
-  /// Get followers list
-  static Future<List<UtilisateurProfile>> getFollowers(String userId) async {
-    final url = Uri.parse('$baseUrl/users/$userId/followers');
-
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final followers = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return (followers as List)
-          .map((e) => UtilisateurProfile.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
-    throw Exception('Erreur lors du chargement des abonnés');
-  }
-
-  /// Get following list
-  static Future<List<UtilisateurProfile>> getFollowing(String userId) async {
-    final url = Uri.parse('$baseUrl/users/$userId/following');
-
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final following = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return (following as List)
-          .map((e) => UtilisateurProfile.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
-    throw Exception('Erreur lors du chargement des abonnements');
-  }
-
-  // ===== MESSAGING =====
-
-  /// Get all conversations for current user
-  static Future<List<Conversation>> getConversations() async {
-    final url = Uri.parse('$baseUrl/messages/conversations');
-
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final conversations = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return (conversations as List)
-          .map((e) => Conversation.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
-    throw Exception('Erreur lors du chargement des conversations');
-  }
-
-  /// Get messages in a conversation
-  static Future<List<Message>> getMessages(
-    String conversationId, {
-    int limit = 30,
-  }) async {
-    final params = {'limit': limit.toString()};
-    final url = Uri.parse(
-      '$baseUrl/messages/$conversationId',
-    ).replace(queryParameters: params);
-
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final messages = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return (messages as List)
-          .map((e) => Message.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
-    throw Exception('Erreur lors du chargement des messages');
-  }
-
-  /// Send a message in a conversation
-  static Future<Message> sendMessage({
+  static Future<bool> sendMessage({
     required String conversationId,
     required String texte,
   }) async {
-    final url = Uri.parse('$baseUrl/messages/$conversationId');
-
-    final response = await AuthService.authorizedPost(
-      url,
-      body: jsonEncode({'texte': texte}),
+    final response = await _dio.post(
+      '/conversations/$conversationId/messages',
+      data: {'texte': texte},
     );
-
-    if (response.statusCode == 201 || response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final messageData = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return Message.fromJson(messageData);
-    }
-    throw Exception('Erreur lors de l\'envoi du message');
+    return response.statusCode == 201 || response.statusCode == 200;
   }
 
-  // ===== SEARCH =====
-
-  /// Search for users and publications
   static Future<Map<String, dynamic>> search(String query) async {
-    final params = {'q': query, 'type': 'users,publications'};
-    final url = Uri.parse('$baseUrl/search').replace(queryParameters: params);
-
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-
-      return {
-        'users': (decoded['users'] as List? ?? [])
-            .map((e) => UtilisateurProfile.fromJson(e as Map<String, dynamic>))
-            .toList(),
-        'publications': (decoded['publications'] as List? ?? [])
-            .map((e) => Publication.fromJson(e as Map<String, dynamic>))
-            .toList(),
-      };
-    }
-    throw Exception('Erreur lors de la recherche');
+    final response =
+        await _dio.get('/search', queryParameters: {'q': query});
+    return response.data as Map<String, dynamic>;
   }
 
-  // ===== TRENDS =====
-
-  /// Get trending topics/hashtags
-  static Future<List<Map<String, dynamic>>> getTrends() async {
-    final url = Uri.parse('$baseUrl/trends');
-
-    final response = await AuthService.authorizedGet(url);
-    if (response.statusCode == 200) {
-      final decoded = jsonDecode(response.body);
-      final trends = decoded is Map<String, dynamic>
-          ? decoded['data']
-          : decoded;
-      return (trends as List).map((e) => e as Map<String, dynamic>).toList();
-    }
-    throw Exception('Erreur lors du chargement des tendances');
-  }
-
-  // ===== REPORT/FLAG =====
-
-  /// Report a publication as inappropriate
-  static Future<bool> reportPublication({
-    required String publicationId,
-    required String reason,
-    String? details,
+  static Future<bool> createSignalement({
+    required String titre,
+    required String description,
+    required String categorieId,
+    required String adresse,
+    required double latitude,
+    required double longitude,
+    XFile? image,
   }) async {
-    final url = Uri.parse('$baseUrl/publications/$publicationId/report');
+    if (image != null) {
+      final formData = FormData.fromMap({
+        'titre': titre,
+        'description': description,
+        'categorieId': categorieId,
+        'adresse': adresse,
+        'latitude': latitude,
+        'longitude': longitude,
+        'photo': await MultipartFile.fromFile(
+          image.path,
+          filename: image.name,
+        ),
+      });
+      final response = await _dio.post(
+        ApiEndpoints.signalementCitoyen,
+        data: formData,
+        options: Options(contentType: 'multipart/form-data'),
+      );
+      return response.statusCode == 201 || response.statusCode == 200;
+    }
 
-    final body = {'reason': reason, if (details != null) 'details': details};
-
-    final response = await AuthService.authorizedPost(
-      url,
-      body: jsonEncode(body),
-    );
-    return response.statusCode == 200 || response.statusCode == 201;
+    final response = await _dio.post(ApiEndpoints.signalementCitoyen, data: {
+      'titre': titre,
+      'description': description,
+      'categorieId': categorieId,
+      'adresse': adresse,
+      'latitude': latitude,
+      'longitude': longitude,
+    });
+    return response.statusCode == 201 || response.statusCode == 200;
   }
 }

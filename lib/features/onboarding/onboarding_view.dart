@@ -76,7 +76,7 @@ class _OnboardingViewState extends State<OnboardingView> {
               color: const Color(0xFFFFF3E6),
               borderRadius: BorderRadius.circular(32),
             ),
-            child: Icon(page.icon, size: 72, color: const Color(0xFFFF7F00)),
+            child: Icon(page.icon, size: 72, color: const Color(0xFFE65C00)),
           ),
           const SizedBox(height: 36),
           Text(
@@ -157,7 +157,7 @@ class _OnboardingViewState extends State<OnboardingView> {
                     height: 10,
                     decoration: BoxDecoration(
                       color: _currentIndex == index
-                          ? const Color(0xFFFF7F00)
+                          ? const Color(0xFFE65C00)
                           : Colors.grey[300],
                       borderRadius: BorderRadius.circular(10),
                     ),

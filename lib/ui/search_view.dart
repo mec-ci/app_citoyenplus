@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import '../models/publication.dart';
-import '../models/utilisateur_profile.dart';
-import '../services/api_service.dart';
-import '../widgets/publication_card.dart';
+import 'package:citoyen_plus/models/publication.dart';
+import 'package:citoyen_plus/models/utilisateur_profile.dart';
+import 'package:citoyen_plus/models/post.dart';
+import 'package:citoyen_plus/models/signalement.dart';
+import 'package:citoyen_plus/services/api_service.dart';
+import 'package:citoyen_plus/widgets/publication_card.dart';
 import 'profil_view.dart';
 
 class SearchView extends StatefulWidget {
@@ -14,9 +16,7 @@ class SearchView extends StatefulWidget {
 
 class _SearchViewState extends State<SearchView> {
   final TextEditingController _searchController = TextEditingController();
-  Future<Map<String, dynamic>>? _futureResults;
-  
-
+  Future<Map<String, dynamic>>? _searchFuture;
   @override
   void dispose() {
     _searchController.dispose();
@@ -27,8 +27,26 @@ class _SearchViewState extends State<SearchView> {
     final query = _searchController.text.trim();
     if (query.isEmpty) return;
     setState(() {
-      _futureResults = ApiService.search(query);
+      _searchFuture = _multiSearch(query);
     });
+  }
+
+  Future<Map<String, dynamic>> _multiSearch(String query) async {
+    final results = await Future.wait([
+      ApiService.search(query).catchError((_) => <String, dynamic>{}),
+      ApiService.fetchPosts(page: 1, limit: 5).catchError((_) => <PostModel>[]),
+      ApiService.fetchSignalements(page: 1, limit: 5).catchError((_) => <SignalementModel>[]),
+      ApiService.fetchLibraryDocuments(query).catchError((_) => <Map<String, dynamic>>[]),
+      ApiService.fetchQuizCategories().catchError((_) => <Map<String, dynamic>>[]),
+    ]);
+
+    return {
+      'search': results[0] as Map<String, dynamic>,
+      'posts': results[1] as List<PostModel>,
+      'signalements': results[2] as List<SignalementModel>,
+      'documents': results[3] as List<Map<String, dynamic>>,
+      'quizCategories': results[4] as List<Map<String, dynamic>>,
+    };
   }
 
   @override
@@ -36,7 +54,7 @@ class _SearchViewState extends State<SearchView> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Recherche'),
-        backgroundColor: const Color(0xFFFF7F00),
+        backgroundColor: const Color(0xFFE65C00),
       ),
       body: SafeArea(
         child: Padding(
@@ -51,7 +69,7 @@ class _SearchViewState extends State<SearchView> {
                       textInputAction: TextInputAction.search,
                       onSubmitted: (_) => _search(),
                       decoration: InputDecoration(
-                        hintText: 'Rechercher des utilisateurs ou des publications',
+                        hintText: 'Rechercher...',
                         prefixIcon: const Icon(Icons.search_rounded),
                         filled: true,
                         fillColor: const Color(0xFFF8F9FF),
@@ -65,84 +83,256 @@ class _SearchViewState extends State<SearchView> {
                   const SizedBox(width: 10),
                   ElevatedButton(
                     onPressed: _search,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFE65C00),
+                      foregroundColor: Colors.white,
+                    ),
                     child: const Text('OK'),
                   ),
                 ],
               ),
               const SizedBox(height: 16),
               Expanded(
-                child: _futureResults == null
-                    ? const Center(
-                        child: Text(
-                          'Tapez un terme et lancez la recherche.',
-                          style: TextStyle(color: Colors.black54),
-                        ),
-                      )
-                    : FutureBuilder<Map<String, dynamic>>(
-                        future: _futureResults,
-                        builder: (context, snapshot) {
-                          if (snapshot.connectionState == ConnectionState.waiting) {
-                            return const Center(child: CircularProgressIndicator());
-                          }
-                          if (snapshot.hasError) {
-                            return Center(child: Text('Erreur: ${snapshot.error}'));
-                          }
-                          final data = snapshot.data ?? {};
-                          final users = data['users'] as List<UtilisateurProfile>? ?? [];
-                          final publications = data['publications'] as List<Publication>? ?? [];
-                          if (users.isEmpty && publications.isEmpty) {
-                            return const Center(
-                              child: Text('Aucun résultat trouvé.', style: TextStyle(color: Colors.black54)),
-                            );
-                          }
-                          return ListView(
-                            children: [
-                              if (users.isNotEmpty) ...[
-                                const Text('Utilisateurs', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                                const SizedBox(height: 10),
-                                ...users.map((user) {
-                                  return ListTile(
-                                    contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
-                                    leading: CircleAvatar(
-                                          backgroundColor: const Color(0xFF1556B5),
-                                          backgroundImage: user.avatar != null ? NetworkImage(user.avatar!) : null,
-                                          child: user.avatar == null ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U') : null,
-                                        ),
-                                        title: Text(user.name),
-                                        subtitle: Text(user.bio ?? ''),
-                                    trailing: const Icon(Icons.chevron_right_rounded),
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (_) => ProfilView(userId: user.id),
-                                        ),
-                                      );
-                                    },
-                                  );
-                                }),
-                                const Divider(height: 32),
-                              ],
-                              if (publications.isNotEmpty) ...[
-                                const Text('Publications', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-                                const SizedBox(height: 10),
-                                ...publications.map((publication) {
-                                  return PublicationCard(
-                                    publication: publication,
-                                    onComment: () {},
-                                    onLike: () {},
-                                  );
-                                }),
-                              ],
-                            ],
-                          );
-                        },
-                      ),
+                child: _searchFuture == null
+                    ? _buildEmptyState()
+                    : _buildResults(),
               ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return const Center(
+      child: Text(
+        'Tapez un terme et lancez la recherche.',
+        style: TextStyle(color: Colors.black54),
+      ),
+    );
+  }
+
+  Widget _buildResults() {
+    return FutureBuilder<Map<String, dynamic>>(
+      future: _searchFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        if (snapshot.hasError) {
+          return Center(child: Text('Erreur: ${snapshot.error}'));
+        }
+
+        final data = snapshot.data!;
+        final searchResults = data['search'] as Map<String, dynamic>;
+        final users = (searchResults['users'] as List?)
+                ?.map((e) => UtilisateurProfile.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            <UtilisateurProfile>[];
+        final publications = (searchResults['publications'] as List?)
+                ?.map((e) => Publication.fromJson(e as Map<String, dynamic>))
+                .toList() ??
+            <Publication>[];
+        final posts = data['posts'] as List<PostModel>;
+        final signalements = data['signalements'] as List<SignalementModel>;
+        final documents = data['documents'] as List<Map<String, dynamic>>;
+        final quizCategories = data['quizCategories'] as List<Map<String, dynamic>>;
+
+        final hasResults = users.isNotEmpty ||
+            publications.isNotEmpty ||
+            posts.isNotEmpty ||
+            signalements.isNotEmpty ||
+            documents.isNotEmpty ||
+            quizCategories.isNotEmpty;
+
+        if (!hasResults) {
+          return const Center(
+            child: Text(
+              'Aucun resultat trouve.',
+              style: TextStyle(color: Colors.black54),
+            ),
+          );
+        }
+
+        return ListView(
+          children: [
+            if (users.isNotEmpty) ...[
+              _sectionHeader('Utilisateurs', Icons.people_outline),
+              const SizedBox(height: 8),
+              ...users.map((user) => _userTile(user)),
+              const SizedBox(height: 16),
+            ],
+            if (publications.isNotEmpty) ...[
+              _sectionHeader('Publications', Icons.article_outlined),
+              const SizedBox(height: 8),
+              ...publications.map((pub) => PublicationCard(
+                    publication: pub,
+                    onComment: () {},
+                    onLike: () {},
+                  )),
+              const SizedBox(height: 16),
+            ],
+            if (posts.isNotEmpty) ...[
+              _sectionHeader('Actualites', Icons.newspaper_outlined),
+              const SizedBox(height: 8),
+              ...posts.map((post) => _postTile(post)),
+              const SizedBox(height: 16),
+            ],
+            if (signalements.isNotEmpty) ...[
+              _sectionHeader('Signalements', Icons.report_problem_outlined),
+              const SizedBox(height: 8),
+              ...signalements.map((s) => _signalementTile(s)),
+              const SizedBox(height: 16),
+            ],
+            if (documents.isNotEmpty) ...[
+              _sectionHeader('Documents', Icons.library_books_outlined),
+              const SizedBox(height: 8),
+              ...documents.map((doc) => _documentTile(doc)),
+              const SizedBox(height: 16),
+            ],
+            if (quizCategories.isNotEmpty) ...[
+              _sectionHeader('Quiz', Icons.emoji_events_outlined),
+              const SizedBox(height: 8),
+              ...quizCategories.map((cat) => _quizTile(cat)),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _sectionHeader(String title, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: const Color(0xFFE65C00)),
+        const SizedBox(width: 8),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _userTile(UtilisateurProfile user) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+      leading: CircleAvatar(
+        backgroundColor: const Color(0xFF1556B5),
+        backgroundImage: user.avatar != null ? NetworkImage(user.avatar!) : null,
+        child: user.avatar == null
+            ? Text(user.name.isNotEmpty ? user.name[0].toUpperCase() : 'U')
+            : null,
+      ),
+      title: Text(user.name),
+      subtitle: Text(user.bio ?? ''),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ProfilView(userId: user.id),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _postTile(PostModel post) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+      leading: post.imageUrl != null
+          ? ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                post.imageUrl!,
+                width: 50,
+                height: 50,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 50,
+                  height: 50,
+                  color: const Color(0xFFF0F0F0),
+                  child: const Icon(Icons.article, color: Colors.grey),
+                ),
+              ),
+            )
+          : Container(
+              width: 50,
+              height: 50,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0F0F0),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.article, color: Colors.grey),
+            ),
+      title: Text(post.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(post.excerpt, maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () {},
+    );
+  }
+
+  Widget _signalementTile(SignalementModel s) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+      leading: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF0E6),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(Icons.location_on, color: Color(0xFFE65C00)),
+      ),
+      title: Text(s.titre, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(s.adresse, maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () {},
+    );
+  }
+
+  Widget _documentTile(Map<String, dynamic> doc) {
+    final title = doc['title']?.toString() ?? doc['titre']?.toString() ?? '';
+    final desc = doc['description']?.toString() ?? '';
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+      leading: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: const Color(0xFFE6F1FB),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(Icons.description, color: Color(0xFF185FA5)),
+      ),
+      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(desc, maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () {},
+    );
+  }
+
+  Widget _quizTile(Map<String, dynamic> cat) {
+    final title = cat['title']?.toString() ?? cat['nom']?.toString() ?? '';
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
+      leading: Container(
+        width: 50,
+        height: 50,
+        decoration: BoxDecoration(
+          color: const Color(0xFFEAF3DE),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Icon(Icons.quiz_outlined, color: Color(0xFF3B6D11)),
+      ),
+      title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      trailing: const Icon(Icons.chevron_right_rounded),
+      onTap: () {},
     );
   }
 }

@@ -228,7 +228,7 @@ class _PostCardState extends State<PostCard> {
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     gradient: LinearGradient(
-                      colors: [Color(0xFFFF7F00), Color(0xFF1556B5)],
+                      colors: [Color(0xFFE65C00), Color(0xFF1556B5)],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),

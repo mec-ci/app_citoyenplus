@@ -1,8 +1,12 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:citoyen_plus/core/network/dio_client.dart';
+import 'package:citoyen_plus/core/network/api_endpoints.dart';
 
 class NotificationService {
   static final _plugin = FlutterLocalNotificationsPlugin();
+  static final Dio _dio = DioClient.getInstance();
 
   static Future<void> init() async {
     const androidSettings =
@@ -12,7 +16,6 @@ class NotificationService {
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
-    // ✅ Settings Linux obligatoires quand on développe sur Linux
     const linuxSettings = LinuxInitializationSettings(
       defaultActionName: 'Open notification',
     );
@@ -26,7 +29,6 @@ class NotificationService {
         ),
       );
 
-      // Demande la permission selon la plateforme cible (téléphone)
       if (defaultTargetPlatform == TargetPlatform.android) {
         final androidPlugin = _plugin
             .resolvePlatformSpecificImplementation<
@@ -45,14 +47,20 @@ class NotificationService {
     }
   }
 
-  /// Affiche une notification immédiate
+  static Future<void> registerDeviceToken(String fcmToken) async {
+    try {
+      await _dio.post(
+        ApiEndpoints.notificationsRegister,
+        data: {'token': fcmToken, 'platform': defaultTargetPlatform.name},
+      );
+    } catch (_) {}
+  }
+
   static Future<void> show({
     required String titre,
     required String corps,
   }) async {
-    if (kIsWeb) {
-      return;
-    }
+    if (kIsWeb) return;
 
     await _plugin.show(
       DateTime.now().millisecondsSinceEpoch ~/ 1000,
@@ -62,7 +70,7 @@ class NotificationService {
         android: AndroidNotificationDetails(
           'citoyen_plus_channel',
           'Citoyen +',
-          channelDescription: 'Notifications de l\'application Citoyen +',
+          channelDescription: "Notifications de l'application Citoyen +",
           importance: Importance.high,
           priority: Priority.high,
           icon: '@mipmap/ic_launcher',

@@ -31,7 +31,7 @@ dependencies:
   flutter:
     sdk: flutter
   shared_preferences: ^2.0.15
-  flutter_secure_storage: ^8.0.0
+  flutter_secure_storage: ^9.0.0
   google_sign_in: ^6.1.0
   local_auth: ^2.1.6
   url_launcher: ^6.1.10
@@ -45,13 +45,16 @@ dependencies:
   http: ^1.6.0
   share_plus: ^10.0.0
   geolocator: ^14.0.2
-  flutter_riverpod: ^2.4.0
-  cached_network_image: ^3.2.3
+  geocoding: ^2.1.1
+  dio: ^5.4.0
+  flutter_riverpod: ^2.5.1
+  cached_network_image: ^3.3.1
+  shimmer: ^3.0.0
   flutter_local_notifications: ^17.0.0
   firebase_messaging: ^15.0.0
   firebase_core: ^3.0.0
   socket_io_client: ^2.0.0
-  flutter_dotenv: ^5.1.0
+  flutter_dotenv: ^6.0.1
  
 
 
@@ -85,7 +88,6 @@ flutter:
 
   assets:
     - assets/
-    - .env
 
   fonts:
     - family: Metropolis

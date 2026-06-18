@@ -1,23 +1,17 @@
-import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:citoyen_plus/models/signalement.dart';
-import '../config/api_config.dart';
-import 'auth_service.dart';
+import 'package:citoyen_plus/core/network/dio_client.dart';
+import 'package:citoyen_plus/core/network/api_endpoints.dart';
 
 class RecupererSignalementService {
-  static Future<List<SignalementModel>> fetchAllSignalement(String token) async {
-    final url = Uri.parse('${ApiConfig.baseUrl}/signalement-citoyen');
-    final response = await AuthService.authorizedGet(url);
+  static final Dio _dio = DioClient.getInstance();
 
-    if (response.statusCode == 200) {
-      final Map<String, dynamic> jsonResponse = jsonDecode(response.body);
-
-      // Si ton API renvoie { data: [...] }
-      final List<dynamic> postsJson = jsonResponse['data'];
-
-      return postsJson.map((json) => SignalementModel.fromJson(json)).toList();
-    } else {
-      throw Exception('Erreur lors de la récupération des signalements: ${response.body}');
-    }
+  static Future<List<SignalementModel>> fetchAllSignalement() async {
+    final response = await _dio.get(ApiEndpoints.signalementCitoyen);
+    final data = response.data;
+    final items = data is Map<String, dynamic> ? data['data'] ?? data : data;
+    return (items as List)
+        .map((json) => SignalementModel.fromJson(json as Map<String, dynamic>))
+        .toList();
   }
 }
-

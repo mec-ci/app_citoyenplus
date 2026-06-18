@@ -32,7 +32,7 @@ class _PosterActionSheetState extends State<_PosterActionSheet> {
   Uint8List? _imageBytes;
   bool _loading = false;
 
-  static const _orange = Color(0xFFFF7F00);
+  static const _orange = Color(0xFFE65C00);
   static const _blue = Color(0xFF1556B5);
   static const _fillColor = Color(0xFFF8F9FF);
 
@@ -146,10 +146,14 @@ class _PosterActionSheetState extends State<_PosterActionSheet> {
     setState(() => _loading = true);
 
     try {
+      final excerpt = _contenuController.text.trim().length > 100
+          ? _contenuController.text.trim().substring(0, 100)
+          : _contenuController.text.trim();
       final newPost = await createArticle(
         _titreController.text.trim(),
         _contenuController.text.trim(),
         date: DateTime.now(),
+        excerpt: excerpt,
         image: _image,
       );
       if (mounted) {

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
-import '../services/auth_service.dart';
 import 'entete.dart';
 import 'quizquestions.dart';
 
-const _orange = Color(0xFFFF7F00);
+const _orange = Color(0xFFE65C00);
 const _blue = Color(0xFF1556B5);
 const _green = Color(0xFF34C759);
 
@@ -93,8 +92,7 @@ class _QuizViewState extends State<QuizView> {
       _categoriesError = null;
     });
     try {
-      final token = await AuthService.getToken();
-      final categories = await ApiService.fetchQuizCategories(token ?? '');
+      final categories = await ApiService.fetchQuizCategories();
       if (!mounted) return;
       setState(() {
         _categories = categories.asMap().entries.map((entry) {
@@ -310,38 +308,46 @@ class _QuizViewState extends State<QuizView> {
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 8),
-                              // Étoiles de progression
+                              // Niveaux complétés
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: List.generate(3, (i) {
                                   final done = _progress[title]?[i + 1] == true;
-                                  return Icon(
-                                    done
-                                        ? Icons.star_rounded
-                                        : Icons.star_outline_rounded,
-                                    color: done ? _orange : Colors.grey[300],
-                                    size: 18,
+                                  return Container(
+                                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                                    width: 8,
+                                    height: 8,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: done ? _orange : Colors.grey[300],
+                                    ),
                                   );
                                 }),
                               ),
-                              const SizedBox(height: 6),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 10,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: color.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  "$completed/3 niveaux",
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    color: color,
-                                    fontWeight: FontWeight.w700,
+                              const SizedBox(height: 8),
+                              // Barre de progression XP
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: LinearProgressIndicator(
+                                      value: completed / 3.0,
+                                      minHeight: 6,
+                                      backgroundColor: Colors.grey[200],
+                                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                                    ),
                                   ),
-                                ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    "$completed/3 niveaux",
+                                    style: TextStyle(
+                                      fontSize: 9,
+                                      color: Colors.grey[500],
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),

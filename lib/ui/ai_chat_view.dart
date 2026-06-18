@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/network/error_handler.dart';
 import 'entete.dart';
 import '../services/ai_chat_service.dart';
 
@@ -36,14 +37,13 @@ class AiChatViewState extends State<AiChatView> {
 
   bool _isLoading = false;
 
-  final Color mecOrange = const Color(0xFFFF7F00);
+  final Color mecOrange = const Color(0xFFE65C00);
   final Color mecBlue = const Color(0xFF1556B5);
 
   // Contexte système : définit le rôle de l'IA
   static const String _systemPrompt =
-      "Tu es un assistant citoyen expert des institutions ivoiriennes. "
-      "Tu aides les citoyens à comprendre leurs droits, les procédures administratives, "
-      "les lois en Côte d'Ivoire, et tu les guides dans leurs démarches civiques. "
+      "Tu es un assistant expert en droit, constitutions, sur l'état ivoirien et sur la côte d'ivoire. "
+      "Aide l'utilisateur à comprendre les questions portant sur les questions de ton expertise. "
       "Réponds toujours en français, de manière claire, précise et bienveillante. "
       "Si une question dépasse tes compétences, oriente l'utilisateur vers les autorités compétentes.";
 
@@ -92,6 +92,8 @@ class AiChatViewState extends State<AiChatView> {
         });
         _scrollToBottom();
       }
+      final msg = e is Exception ? e.toString().replaceFirst('Exception: ', '') : 'Erreur inconnue';
+      HttpErrorHandler.showErrorAlert('Erreur du Chatbot', msg);
     }
   }
 

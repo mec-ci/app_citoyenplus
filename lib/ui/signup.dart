@@ -242,9 +242,12 @@ class _CreateAccountViewState extends State<CreateAccountView> {
                     ),
                   ),
                   validator: (v) {
-                    if (v!.length < 6) return 'Min. 6 caractères';
-                    if (v != passwordCtrl.text)
+                    if (v!.length < 6) {
+                      return 'Min. 6 caractères';
+                    }
+                    if (v != passwordCtrl.text) {
                       return 'Les mots de passe ne correspondent pas';
+                    }
                     return null;
                   },
                 ),

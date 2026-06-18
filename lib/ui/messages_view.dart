@@ -27,7 +27,8 @@ class _MessagesViewState extends State<MessagesView> {
 
   void _loadConversations() {
     setState(() {
-      _futureConversations = ApiService.getConversations();
+      _futureConversations = ApiService.getConversations()
+          .then((items) => items.map((json) => Conversation.fromJson(json)).toList());
     });
   }
 
@@ -36,7 +37,7 @@ class _MessagesViewState extends State<MessagesView> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Messages'),
-        backgroundColor: const Color(0xFFFF7F00),
+        backgroundColor: const Color(0xFFE65C00),
       ),
       body: FutureBuilder<List<Conversation>>(
         future: _futureConversations,
@@ -66,7 +67,7 @@ class _MessagesViewState extends State<MessagesView> {
 
           return RefreshIndicator(
             onRefresh: () async => _loadConversations(),
-            color: const Color(0xFFFF7F00),
+            color: const Color(0xFFE65C00),
             child: ListView.separated(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
               itemCount: conversations.length,
@@ -99,7 +100,7 @@ class _MessagesViewState extends State<MessagesView> {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFF7F00),
+                            color: const Color(0xFFE65C00),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(

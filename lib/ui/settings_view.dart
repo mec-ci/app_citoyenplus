@@ -34,7 +34,7 @@ class _SettingsViewState extends State<SettingsView> {
   bool _biometricEnabled = false;
   String? _avatarUrl;
 
-  static const _orange = Color(0xFFFF7F00);
+  static const _orange = Color(0xFFE65C00);
   static const _blue = Color(0xFF1556B5);
   static const _fillColor = Color(0xFFF8F9FF);
 
@@ -102,8 +102,7 @@ class _SettingsViewState extends State<SettingsView> {
 
   Future<void> _loadProfile() async {
     try {
-      final token = await AuthService.getToken();
-      final data = await UserService.fetchProfile(token ?? '');
+      final data = await UserService.fetchProfile();
       if (!mounted) return;
       setState(() {
         fullnameCtrl.text = data['fullname'] ?? data['name'] ?? '';
@@ -147,9 +146,7 @@ class _SettingsViewState extends State<SettingsView> {
     try {
       final image = await _picker.pickImage(source: ImageSource.gallery, imageQuality: 80);
       if (image == null) return;
-      final token = await AuthService.getToken();
-      if (token == null) return;
-      final uploadedUrl = await UserService.uploadAvatar(token, image);
+      final uploadedUrl = await UserService.uploadAvatar(image);
       if (!mounted) return;
       if (uploadedUrl != null) {
         setState(() => _avatarUrl = uploadedUrl);
@@ -172,14 +169,7 @@ class _SettingsViewState extends State<SettingsView> {
   Future<void> _saveProfile() async {
     setState(() => _isSavingProfile = true);
     try {
-      final token = await AuthService.getToken();
-      if (token == null) {
-        if (!mounted) return;
-        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginView()), (route) => false);
-        return;
-      }
       final success = await UserService.updateProfile(
-        token: token,
         name: fullnameCtrl.text.trim(),
         email: emailCtrl.text.trim(),
         phone: phoneCtrl.text.trim(),
@@ -216,14 +206,7 @@ class _SettingsViewState extends State<SettingsView> {
 
     setState(() => _isChangingPassword = true);
     try {
-      final token = await AuthService.getToken();
-      if (token == null) {
-        if (!mounted) return;
-        Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginView()), (route) => false);
-        return;
-      }
       final success = await UserService.changePassword(
-        token: token,
         oldPassword: oldPasswordCtrl.text.trim(),
         newPassword: newPasswordCtrl.text.trim(),
       );

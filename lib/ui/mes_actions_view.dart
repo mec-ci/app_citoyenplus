@@ -15,7 +15,7 @@ class MesActionsView extends StatefulWidget {
 class _MesActionsViewState extends State<MesActionsView> {
   late Future<List<SignalementModel>> _futureSignalements;
 
-  static const _orange = Color(0xFFFF7F00);
+  static const _orange = Color(0xFFE65C00);
   static const _blue = Color(0xFF1556B5);
 
   @override
@@ -205,7 +205,7 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statut = signalement.statut ?? 'NOUVEAU';
+    final statut = signalement.statut;
     final couleur = _couleurStatut(statut);
     final icone = _iconeStatut(statut);
     final date = signalement.createdAt;
@@ -293,8 +293,8 @@ class _ActionCard extends StatelessWidget {
                 const SizedBox(height: 6),
 
                 // ── Catégorie ────────────────────────────────────────
-                if (signalement.categorieNom != null &&
-                    signalement.categorieNom!.isNotEmpty)
+                if (signalement.categorie != null &&
+                    signalement.categorie!.nom.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Row(
@@ -303,7 +303,7 @@ class _ActionCard extends StatelessWidget {
                             size: 12, color: Color(0xFF1556B5)),
                         const SizedBox(width: 4),
                         Text(
-                          signalement.categorieNom!,
+                          signalement.categorie!.nom,
                           style: const TextStyle(
                               fontSize: 11,
                               color: Color(0xFF1556B5),
@@ -356,7 +356,7 @@ class _ActionCard extends StatelessWidget {
     switch (s.toUpperCase()) {
       case 'NOUVEAU':   return const Color(0xFF1556B5);
       case 'EN_COURS':
-      case 'EN COURS':  return const Color(0xFFFF7F00);
+      case 'EN COURS':  return const Color(0xFFE65C00);
       case 'RÉSOLU':
       case 'RESOLU':    return const Color(0xFF34C759);
       case 'REJETÉ':

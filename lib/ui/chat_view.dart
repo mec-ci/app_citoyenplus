@@ -40,7 +40,8 @@ class _ChatViewState extends State<ChatView> {
 
   void _loadMessages() {
     setState(() {
-      _futureMessages = ApiService.getMessages(widget.conversation.id);
+      _futureMessages = ApiService.getMessages(widget.conversation.id)
+          .then((items) => items.map((json) => Message.fromJson(json)).toList());
     });
   }
 
@@ -83,7 +84,7 @@ class _ChatViewState extends State<ChatView> {
             ),
           ],
         ),
-        backgroundColor: const Color(0xFFFF7F00),
+        backgroundColor: const Color(0xFFE65C00),
       ),
       body: SafeArea(
         child: Column(
@@ -126,7 +127,7 @@ class _ChatViewState extends State<ChatView> {
                           margin: const EdgeInsets.symmetric(vertical: 6),
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
-                            color: isMe ? const Color(0xFFFF7F00) : Colors.grey[200],
+                            color: isMe ? const Color(0xFFE65C00) : Colors.grey[200],
                             borderRadius: BorderRadius.only(
                               topLeft: const Radius.circular(18),
                               topRight: const Radius.circular(18),
@@ -185,7 +186,7 @@ class _ChatViewState extends State<ChatView> {
                   const SizedBox(width: 10),
                   CircleAvatar(
                     radius: 24,
-                    backgroundColor: const Color(0xFFFF7F00),
+                    backgroundColor: const Color(0xFFE65C00),
                     child: IconButton(
                       onPressed: _sending ? null : _sendMessage,
                       icon: _sending

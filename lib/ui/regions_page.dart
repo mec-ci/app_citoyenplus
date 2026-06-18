@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'detail_page.dart';
 
-const _orange = Color(0xFFFF7F00);
+const _orange = Color(0xFFE65C00);
 const _blue = Color(0xFF1556B5);
 
 // ── Données enrichies par région ─────────────────────────────────────────────

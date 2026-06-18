@@ -27,7 +27,7 @@ class _NotificationViewState extends State<NotificationView> {
     setState(() {
       _futureNotifications = token == null
           ? Future.value([])
-          : ApiService.fetchNotifications(token);
+          : ApiService.fetchNotifications();
     });
   }
 
@@ -137,7 +137,7 @@ class _NotificationViewState extends State<NotificationView> {
                 builder: (context, snapshot) {
                   if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(
-                      child: CircularProgressIndicator(color: Color(0xFFFF7F00)),
+                      child: CircularProgressIndicator(color: Color(0xFFE65C00)),
                     );
                   }
                   if (snapshot.hasError) {
@@ -149,7 +149,7 @@ class _NotificationViewState extends State<NotificationView> {
                           const SizedBox(height: 12),
                           const Text('Erreur de chargement', style: TextStyle(color: Colors.white38, fontSize: 14)),
                           const SizedBox(height: 12),
-                          TextButton(onPressed: _load, child: const Text('Réessayer', style: TextStyle(color: Color(0xFFFF7F00)))),
+                          TextButton(onPressed: _load, child: const Text('Réessayer', style: TextStyle(color: Color(0xFFE65C00)))),
                         ],
                       ),
                     );
@@ -173,7 +173,7 @@ class _NotificationViewState extends State<NotificationView> {
 
                   return RefreshIndicator(
                     onRefresh: _load,
-                    color: const Color(0xFFFF7F00),
+                    color: const Color(0xFFE65C00),
                     backgroundColor: const Color(0xFF1C1C1C),
                     child: ListView.builder(
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -203,7 +203,7 @@ class _NotificationTile extends StatelessWidget {
       return const Color(0xFF34C759);
     }
     if (status.contains('en cours') || status.contains('encours') || status.contains('pending')) {
-      return const Color(0xFFFF7F00);
+      return const Color(0xFFE65C00);
     }
     if (status.contains('rejeté') || status.contains('rejet') || status.contains('rejected')) {
       return const Color(0xFFFF2D55);

@@ -46,7 +46,7 @@ class _SignalementSheetState extends State<_SignalementSheet> {
   bool _submitting = false;
 
   // Couleurs MEC
-  static const _orange = Color(0xFFFF7F00);
+  static const _orange = Color(0xFFE65C00);
   static const _blue = Color(0xFF1556B5);
   static const _fillColor = Color(0xFFF8F9FF);
 
@@ -194,7 +194,7 @@ class _SignalementSheetState extends State<_SignalementSheet> {
       _categoriesError = null;
     });
     try {
-      final result = await fetchAllCategories();
+      final result = await CategorieSignalementService.fetchAllCategories();
       if (mounted) {
         setState(() {
           _categories = result;
@@ -207,6 +207,10 @@ class _SignalementSheetState extends State<_SignalementSheet> {
           _categoriesError = 'Impossible de charger les catégories.';
           _categoriesLoading = false;
         });
+        _showErrorAlert(
+          'Erreur de chargement',
+          'Impossible de charger les catégories de signalement.\n\nDétail technique : $e\n\nVérifiez votre connexion internet.',
+        );
       }
     }
   }
@@ -325,8 +329,35 @@ class _SignalementSheetState extends State<_SignalementSheet> {
       if (mounted) {
         _showSnack('Erreur : $e');
         setState(() => _submitting = false);
+        _showErrorAlert(
+          'Erreur d\'envoi',
+          'Votre signalement n\'a pas pu être envoyé.\n\nDétail : $e\n\nVeuillez réessayer plus tard.',
+        );
       }
     }
+  }
+
+  void _showErrorAlert(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            const Icon(Icons.error_outline, color: Colors.red, size: 22),
+            const SizedBox(width: 8),
+            Text(title, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 17)),
+          ],
+        ),
+        content: Text(message, style: const TextStyle(fontSize: 14, height: 1.4)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Fermer', style: TextStyle(color: Color(0xFFE65C00))),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showSnack(String msg) {

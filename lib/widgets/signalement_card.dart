@@ -168,7 +168,7 @@ class _SignalementCardState extends State<SignalementCard> {
     switch (statut.toUpperCase()) {
       case 'NOUVEAU':     return const Color(0xFF1556B5);
       case 'EN_COURS':
-      case 'EN COURS':   return const Color(0xFFFF7F00);
+      case 'EN COURS':   return const Color(0xFFE65C00);
       case 'RÉSOLU':
       case 'RESOLU':     return const Color(0xFF34C759);
       case 'REJETÉ':

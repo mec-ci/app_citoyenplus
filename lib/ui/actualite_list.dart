@@ -59,6 +59,7 @@ class _ActualiteListState extends State<ActualiteList> {
                 _titleController.text,
                 _contentController.text,
                 date: DateTime.now(),
+                excerpt: _excerptController.text,
               );
             });
           },

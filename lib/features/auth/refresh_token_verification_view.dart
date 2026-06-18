@@ -1,4 +1,3 @@
-import 'package:citoyen_plus/features/onboarding/onboarding_service.dart';
 import 'package:citoyen_plus/services/auth_service.dart';
 import 'package:citoyen_plus/ui/accueil.dart';
 import 'package:flutter/material.dart';
@@ -69,7 +68,7 @@ class _RefreshTokenVerificationViewState
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
         title: const Text('Vérifier votre token'),
-        backgroundColor: const Color(0xFFFF7F00),
+        backgroundColor: const Color(0xFFE65C00),
       ),
       body: SafeArea(
         child: Padding(

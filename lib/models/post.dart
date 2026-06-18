@@ -8,6 +8,8 @@ class PostModel {
   final String content;
   final String? imageUrl;
   final DateTime date;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   PostModel({
     required this.id,
@@ -17,36 +19,43 @@ class PostModel {
     required this.content,
     this.imageUrl,
     required this.date,
+    this.createdAt,
+    this.updatedAt,
   });
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
     final rawImage = json['imageUrl'] as String?;
     return PostModel(
-      id: json['id'] ?? '',
-      slug: json['slug'] ?? '',
-      title: json['title'] ?? '',
-      excerpt: json['excerpt'] ?? '',
-      content: json['content'] ?? '',
-        imageUrl: (rawImage != null && rawImage.isNotEmpty)
+      id: (json['id'] ?? '').toString(),
+      slug: json['slug']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      excerpt: json['excerpt']?.toString() ?? '',
+      content: json['content']?.toString() ?? '',
+      imageUrl: (rawImage != null && rawImage.isNotEmpty)
           ? (rawImage.startsWith('http')
-            ? rawImage
-            : '${ApiConfig.host}$rawImage')
+              ? rawImage
+              : '${ApiConfig.host}$rawImage')
           : null,
       date: json['date'] != null
-          ? DateTime.parse(json['date'])
+          ? DateTime.parse(json['date'].toString())
           : DateTime.now(),
+      createdAt: _tryParseDate(json['createdAt']),
+      updatedAt: _tryParseDate(json['updatedAt']),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
-      'slug': slug,
       'title': title,
       'excerpt': excerpt,
       'content': content,
       if (imageUrl != null) 'imageUrl': imageUrl,
       'date': date.toIso8601String(),
     };
+  }
+
+  static DateTime? _tryParseDate(dynamic value) {
+    if (value == null) return null;
+    return DateTime.tryParse(value.toString());
   }
 }

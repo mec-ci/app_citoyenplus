@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
-import '../services/auth_service.dart';
 import 'detail_page.dart';
 import 'regions_page.dart';
 import 'livre_pdf_view.dart';
@@ -25,7 +24,7 @@ class LibrairieView extends StatefulWidget {
 
 class _LibrairieViewState extends State<LibrairieView>
     with SingleTickerProviderStateMixin {
-  static const _orange = Color(0xFFFF7F00);
+  static const _orange = Color(0xFFE65C00);
   static const _blue = Color(0xFF1556B5);
 
   List<Map<String, dynamic>> documents = [];
@@ -57,8 +56,7 @@ class _LibrairieViewState extends State<LibrairieView>
       _documentsError = null;
     });
     try {
-      final token = await AuthService.getToken();
-      final docs = await ApiService.fetchLibraryDocuments('1', token ?? '');
+      final docs = await ApiService.fetchLibraryDocuments(null);
       if (!mounted) return;
       setState(() {
         documents = docs;
@@ -105,7 +103,6 @@ class _LibrairieViewState extends State<LibrairieView>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Header ──────────────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
               child: Column(
@@ -126,8 +123,6 @@ class _LibrairieViewState extends State<LibrairieView>
                     style: TextStyle(fontSize: 13, color: Colors.grey[500]),
                   ),
                   const SizedBox(height: 16),
-
-                  // ── Barre de recherche ─────────────────────────────────
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     decoration: BoxDecoration(
@@ -175,7 +170,6 @@ class _LibrairieViewState extends State<LibrairieView>
                     ),
                   ),
                   const SizedBox(height: 16),
-
                   if (_isLoadingDocuments)
                     const Center(child: CircularProgressIndicator())
                   else if (_documentsError != null)
@@ -193,8 +187,6 @@ class _LibrairieViewState extends State<LibrairieView>
                       ],
                     ),
                   const SizedBox(height: 16),
-
-                  // ── Tabs ───────────────────────────────────────────────
                   Container(
                     height: 46,
                     decoration: BoxDecoration(
@@ -228,10 +220,7 @@ class _LibrairieViewState extends State<LibrairieView>
                 ],
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // ── Contenu ────────────────────────────────────────────────────
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -244,7 +233,6 @@ class _LibrairieViewState extends State<LibrairieView>
     );
   }
 
-  // ── Bibliothèque ──────────────────────────────────────────────────────────
   Widget _buildBibliotheque() {
     if (filteredDocuments.isEmpty) {
       return Center(
@@ -268,7 +256,7 @@ class _LibrairieViewState extends State<LibrairieView>
         crossAxisCount: 2,
         crossAxisSpacing: 16,
         mainAxisSpacing: 16,
-        mainAxisExtent: 260, // ✅ hauteur fixe par cellule — pas d'overflow
+        mainAxisExtent: 260,
       ),
       itemCount: filteredDocuments.length,
       itemBuilder: (context, i) {
@@ -312,7 +300,6 @@ class _LibrairieViewState extends State<LibrairieView>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Image
                 Expanded(
                   child: ClipRRect(
                     borderRadius: const BorderRadius.vertical(
@@ -344,7 +331,6 @@ class _LibrairieViewState extends State<LibrairieView>
                           ),
                   ),
                 ),
-                // Texte
                 Padding(
                   padding: const EdgeInsets.all(10),
                   child: Column(
@@ -383,7 +369,6 @@ class _LibrairieViewState extends State<LibrairieView>
     );
   }
 
-  // ── Informations ──────────────────────────────────────────────────────────
   Widget _buildInformations() {
     final cards = [
       {
@@ -449,7 +434,6 @@ class _LibrairieViewState extends State<LibrairieView>
             ),
             child: Row(
               children: [
-                // Icône
                 Container(
                   width: 52,
                   height: 52,
@@ -465,7 +449,6 @@ class _LibrairieViewState extends State<LibrairieView>
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Texte
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -494,7 +477,6 @@ class _LibrairieViewState extends State<LibrairieView>
                   ),
                 ),
                 const SizedBox(width: 12),
-                // Flèche
                 Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
