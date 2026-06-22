@@ -13,7 +13,19 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await dotenv.load(fileName: 'assets/.env');
+  // Le fichier .env est optionnel : il est ignoré par git et peut être absent
+  // d'un build (ex. APK de CI sans secrets). On ne doit jamais laisser une
+  // exception ici empêcher l'appel à runApp(), sinon l'app reste sur un écran
+  // blanc au démarrage. isOptional initialise un environnement vide si le
+  // fichier manque, et le try/catch couvre tout autre échec (fichier illisible…).
+  try {
+    await dotenv.load(fileName: 'assets/.env', isOptional: true);
+  } catch (e) {
+    debugPrint('dotenv load error: $e');
+    // Garantit que dotenv est initialisé pour éviter une NotInitializedError
+    // lors des accès ultérieurs à dotenv.env (AiChatService, ApiConfig…).
+    dotenv.testLoad(fileInput: '');
+  }
   AiChatService.init();
 
   try {

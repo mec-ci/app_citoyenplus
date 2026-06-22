@@ -9,7 +9,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/feed/presentation/pages/create_signalement_page.dart';
 import '../features/feed/presentation/pages/create_action_page.dart';
 import '../features/feed/presentation/providers/feed_provider.dart';
-import 'ai_chat_view.dart';
 import 'librairie_view.dart';
 import 'quiz_view.dart';
 
@@ -39,11 +38,9 @@ class HomeState extends State<Home> {
       onSearchPressed: _goToSearch,
       onProfilePressed: _goToProfile,
     ),
-    AiChatView(
-      onNotificationPressed: _goToNotifications,
-      onSearchPressed: _goToSearch,
-      onProfilePressed: _goToProfile,
-    ),
+    // Emplacement de l'ancien onglet Chatbot IA (index 3), conservé pour ne pas
+    // décaler les index de navigation. Vue désactivée pour le moment.
+    const SizedBox.shrink(),
     NotificationView(onMesActionsPressed: () => goTo(5)),
     MesActionsView(posts: const [], onBackPressed: () => goTo(4)),
   ];
@@ -223,12 +220,7 @@ class HomeState extends State<Home> {
               selected: _navIndex == 2,
               onTap: () => onItemTapped(2),
             ),
-            _NavItem(
-              icon: Icons.smart_toy_outlined,
-              label: 'Chatbot',
-              selected: _navIndex == 3,
-              onTap: () => onItemTapped(3),
-            ),
+            // Onglet Chatbot IA masqué pour le moment (fonctionnalité désactivée).
           ],
         ),
       ),
