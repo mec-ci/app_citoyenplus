@@ -169,9 +169,9 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
     final totalPoints = _currentScore;
     final passed = pct >= 60;
 
-    ref
-        .read(gamificationProvider.notifier)
-        .addPoints(totalPoints, raison: 'quiz:${widget.categorie}:niveau${widget.level}');
+    // Les points sont attribués côté serveur (source de vérité) lors de la
+    // soumission : ici on n'affiche que l'animation locale, sans recréditer.
+    ref.read(gamificationProvider.notifier).celebrate(totalPoints);
 
     // Persiste le résultat du quiz côté serveur (best-effort, repli local).
     _submitQuizResult();
@@ -236,6 +236,9 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
       );
       if (result == null) {
         await _cachePendingResult(quizId, payloadAnswers, userId: userId);
+      } else if (mounted) {
+        // Points attribués par le serveur : on adopte le total serveur.
+        ref.read(gamificationProvider.notifier).refresh();
       }
     } catch (_) {
       // Repli local : on conserve le résultat pour un renvoi ultérieur.
