@@ -8,7 +8,6 @@ import 'package:citoyen_plus/widgets/publication_card.dart';
 import 'package:citoyen_plus/widgets/commentaires_sheet.dart';
 import 'package:citoyen_plus/services/commentaire_service.dart';
 import 'package:citoyen_plus/services/reaction_service.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'detail_page.dart';
 import 'livre_pdf_view.dart';
 import 'quiz_view.dart';
@@ -352,6 +351,7 @@ class _SearchViewState extends State<SearchView> {
   Future<void> _openDocument(Map<String, dynamic> doc) async {
     final rawUrl = (doc['pdf'] ?? doc['url'] ?? doc['documentUrl'] ?? '')
         .toString();
+    final title = doc['title']?.toString() ?? doc['titre']?.toString() ?? '';
     if (rawUrl.isEmpty) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -359,15 +359,12 @@ class _SearchViewState extends State<SearchView> {
       );
       return;
     }
-    final uri = Uri.tryParse(rawUrl);
-    if (uri != null && (uri.isScheme('http') || uri.isScheme('https'))) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-      return;
-    }
     if (!mounted) return;
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => LivrePdfView(pdf: rawUrl)),
+      MaterialPageRoute(
+        builder: (_) => LivrePdfView(pdf: rawUrl, title: title),
+      ),
     );
   }
 
