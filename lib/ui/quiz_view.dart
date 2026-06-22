@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_service.dart';
+import '../services/quiz_service.dart';
 import 'entete.dart';
 import 'quizquestions.dart';
 
@@ -65,11 +66,26 @@ class _QuizViewState extends State<QuizView> {
   bool _isLoadingCategories = true;
   String? _categoriesError;
 
+  /// Questions issues de l'API regroupées par titre de catégorie puis par
+  /// niveau (1..3). Vide si l'API a échoué : on retombe alors sur la banque
+  /// de questions locale (fallback hors-ligne explicite).
+  Map<String, Map<int, List<Map<String, dynamic>>>> _apiQuestions = {};
+
   @override
   void initState() {
     super.initState();
     _loadProgress();
     _loadCategories();
+  }
+
+  /// Traduit une difficulté API en niveau (1..3).
+  int _levelForDifficulte(dynamic difficulte) {
+    final d = (difficulte ?? '').toString().toUpperCase();
+    if (d.contains('MOYEN') || d.contains('INTERM')) return 2;
+    if (d.contains('AVANC') || d.contains('DIFFIC') || d.contains('HARD')) {
+      return 3;
+    }
+    return 1;
   }
 
   Future<void> _loadProgress() async {
@@ -92,22 +108,51 @@ class _QuizViewState extends State<QuizView> {
       _categoriesError = null;
     });
     try {
+      // Source par défaut : l'API. fetchQuizCategories / fetchQuizzes retombent
+      // déjà sur les mocks en cas d'échec réseau (fallback hors-ligne explicite).
       final categories = await ApiService.fetchQuizCategories();
+      final quizzes = await ApiService.fetchQuizzes();
       if (!mounted) return;
+
+      // Lien id de catégorie -> titre, pour rattacher les quiz aux catégories.
+      final idToTitle = <String, String>{};
+      final mappedCategories =
+          categories.asMap().entries.map<Map<String, dynamic>>((entry) {
+        final index = entry.key;
+        final item = entry.value;
+        final title =
+            (item['titre'] ?? item['title'] ?? item['name'] ?? 'Thème ${index + 1}')
+                .toString();
+        final id = (item['id'] ?? item['_id'] ?? '').toString();
+        if (id.isNotEmpty) idToTitle[id] = title;
+        return <String, dynamic>{
+          'title': title,
+          'icon': _categoryIconForIndex(index),
+          'color': index.isEven ? _orange : _blue,
+        };
+      }).toList();
+
+      // Construit les questions par catégorie/niveau depuis les quiz API.
+      final apiQuestions = <String, Map<int, List<Map<String, dynamic>>>>{};
+      for (final quiz in quizzes) {
+        final catId = (quiz['categorieId'] ?? quiz['categoryId'] ?? '').toString();
+        final title = idToTitle[catId];
+        if (title == null) continue;
+        final level = _levelForDifficulte(quiz['difficulte'] ?? quiz['difficulty']);
+        final rawQuestions = quiz['questions'];
+        if (rawQuestions is! List) continue;
+        final mapped = rawQuestions
+            .whereType<Map>()
+            .map((q) => QuizService.mapApiQuestion(q.cast<String, dynamic>()))
+            .whereType<Map<String, dynamic>>()
+            .toList();
+        if (mapped.isEmpty) continue;
+        apiQuestions.putIfAbsent(title, () => {})[level] = mapped;
+      }
+
       setState(() {
-        _categories = categories.asMap().entries.map((entry) {
-          final index = entry.key;
-          final item = entry.value;
-          return {
-            'title':
-                item['titre'] ??
-                item['title'] ??
-                item['name'] ??
-                'Thème ${index + 1}',
-            'icon': _categoryIconForIndex(index),
-            'color': index.isEven ? _orange : _blue,
-          };
-        }).toList();
+        _categories = mappedCategories;
+        _apiQuestions = apiQuestions;
         _isLoadingCategories = false;
       });
     } catch (_) {
@@ -259,6 +304,7 @@ class _QuizViewState extends State<QuizView> {
                                 unlockedLevel: unlocked,
                                 completedLevels: _progress[title] ?? {},
                                 onProgressChanged: _loadProgress,
+                                apiQuestionsByLevel: _apiQuestions[title],
                               ),
                             ),
                           );
@@ -374,6 +420,10 @@ class QuizLevelView extends StatelessWidget {
   final Map<int, bool> completedLevels;
   final VoidCallback onProgressChanged;
 
+  /// Questions chargées depuis l'API, par niveau (1..3). Si null ou si un
+  /// niveau est absent, on retombe sur la banque de questions locale.
+  final Map<int, List<Map<String, dynamic>>>? apiQuestionsByLevel;
+
   const QuizLevelView({
     super.key,
     required this.categorie,
@@ -382,6 +432,7 @@ class QuizLevelView extends StatelessWidget {
     required this.unlockedLevel,
     required this.completedLevels,
     required this.onProgressChanged,
+    this.apiQuestionsByLevel,
   });
 
   static const _levelLabels = ["Débutant", "Intermédiaire", "Avancé"];
@@ -454,10 +505,15 @@ class QuizLevelView extends StatelessWidget {
                             builder: (_) => Quizquestions(
                               categorie: categorie,
                               level: level,
-                              questions: getQuestionsForCategoryAndLevel(
-                                categorie,
-                                level,
-                              ),
+                              questions:
+                                  (apiQuestionsByLevel != null &&
+                                          apiQuestionsByLevel![level] != null &&
+                                          apiQuestionsByLevel![level]!.isNotEmpty)
+                                      ? apiQuestionsByLevel![level]!
+                                      : getQuestionsForCategoryAndLevel(
+                                          categorie,
+                                          level,
+                                        ),
                               onLevelCompleted: (passed) async {
                                 if (passed) {
                                   final prefs =

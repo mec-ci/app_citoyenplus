@@ -5,6 +5,7 @@ import 'settings_view.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
 import '../services/api_service.dart';
+import '../services/quiz_service.dart';
 import '../models/signalement.dart';
 import '../providers/gamification_provider.dart';
 
@@ -29,6 +30,7 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
   int actionCount = 0;
   int quizScore = 0;
   int quizTotal = 0;
+  List<QuizResult> quizResults = [];
   List<SignalementModel> mesSignalements = [];
 
   static const _orange = Color(0xFFE65C00);
@@ -52,19 +54,25 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
     super.dispose();
   }
 
+  String? _resolvedUserId;
+
   Future<void> _loadProfile() async {
     try {
       final data = await UserService.fetchProfile();
       if (!mounted) return;
+      final user = data['data'] ?? data;
       setState(() {
         profileData = data;
-        final user = data['data'] ?? data;
         fullnameCtrl.text = user['fullname'] ?? user['name'] ?? '';
         emailCtrl.text = user['email'] ?? '';
         phoneCtrl.text = user['phone'] ?? '';
+        _resolvedUserId =
+            (user['id'] ?? user['_id'] ?? user['userId'] ?? widget.userId)
+                ?.toString();
         isLoading = false;
       });
       _loadStats();
+      _loadQuizResults();
     } catch (e) {
       if (!mounted) return;
       setState(() => isLoading = false);
@@ -78,6 +86,21 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
       setState(() {
         signalementCount = signalements.length;
         mesSignalements = signalements.take(3).toList();
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _loadQuizResults() async {
+    final userId = _resolvedUserId;
+    if (userId == null || userId.isEmpty) return;
+    try {
+      final results = await QuizService.fetchResults(userId);
+      if (!mounted) return;
+      setState(() {
+        quizResults = results;
+        quizScore = results.fold(0, (sum, r) => sum + r.score);
+        quizTotal = results.fold(0, (sum, r) => sum + r.total);
+        actionCount = results.length;
       });
     } catch (_) {}
   }
@@ -134,6 +157,10 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
                   const SizedBox(height: 20),
                   _buildInfoSection(),
                   const SizedBox(height: 20),
+                  if (quizResults.isNotEmpty) ...[
+                    _buildQuizResults(),
+                    const SizedBox(height: 20),
+                  ],
                   if (mesSignalements.isNotEmpty) _buildPersonalFeed(),
                   const SizedBox(height: 20),
                   _buildActions(),
@@ -233,7 +260,11 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
   }
 
   Widget _buildProgressionBar() {
-    final progress = signalementCount.clamp(0, 10) / 10.0;
+    final gami = ref.watch(gamificationProvider);
+    final niveau = gami.niveau;
+    // Progression vers le niveau suivant : 100 points par niveau (indicatif).
+    final pointsDansNiveau = gami.totalPoints % 100;
+    final progress = (pointsDansNiveau / 100.0).clamp(0.0, 1.0);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -253,9 +284,9 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Progression citoyenne',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              Text(
+                'Progression citoyenne · Niveau $niveau',
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               ),
               Text(
                 '${(progress * 100).toInt()}%',
@@ -279,7 +310,7 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Signalez des problemes et participez a des actions pour monter de niveau',
+            '$pointsDansNiveau/100 pts vers le niveau ${niveau + 1} · participez et jouez aux quiz pour progresser',
             style: TextStyle(fontSize: 10, color: Colors.grey[400]),
           ),
         ],
@@ -334,6 +365,71 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildQuizResults() {
+    final pct = quizTotal > 0 ? (quizScore / quizTotal * 100).round() : 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'Mes résultats de quiz',
+              style: TextStyle(
+                  fontWeight: FontWeight.w700, fontSize: 15, color: Colors.black87),
+            ),
+            Text(
+              '$pct% global',
+              style: const TextStyle(
+                  fontWeight: FontWeight.w800, fontSize: 13, color: _orange),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        ...quizResults.take(5).map((r) => Container(
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE0E0E0), width: 0.5),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEAF3DE),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.quiz_outlined,
+                        color: Color(0xFF3B6D11), size: 20),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      r.categorie ?? r.quizId,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                  ),
+                  Text(
+                    '${r.score}/${r.total}',
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 13,
+                        color: _orange),
+                  ),
+                ],
+              ),
+            )),
+      ],
     );
   }
 

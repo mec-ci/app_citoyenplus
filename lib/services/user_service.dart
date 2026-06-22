@@ -13,6 +13,23 @@ class UserService {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Récupère l'identifiant de l'utilisateur connecté depuis le profil serveur.
+  /// Renvoie null en cas d'échec réseau ou si l'id est introuvable.
+  static Future<String?> currentUserId() async {
+    try {
+      final data = await fetchProfile();
+      final user = (data['data'] ?? data);
+      if (user is Map) {
+        final id = user['id'] ?? user['_id'] ?? user['userId'];
+        final str = id?.toString();
+        if (str != null && str.isNotEmpty) return str;
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<Map<String, dynamic>> fetchProfileById(String userId) async {
     final response = await _dio.get('/users/$userId');
     return response.data as Map<String, dynamic>;
