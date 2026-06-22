@@ -26,7 +26,6 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
   bool _isNavigating = false;
 
   int signalementCount = 0;
-  int actionCount = 0;
   int quizScore = 0;
   int quizTotal = 0;
   List<SignalementModel> mesSignalements = [];
@@ -42,6 +41,10 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
     emailCtrl = TextEditingController();
     phoneCtrl = TextEditingController();
     _loadProfile();
+    // Synchronise les points/niveau avec le serveur à l'ouverture du profil.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref.read(gamificationProvider.notifier).refresh();
+    });
   }
 
   @override
@@ -180,6 +183,35 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
             emailCtrl.text,
             style: TextStyle(fontSize: 13, color: Colors.grey[500]),
           ),
+          const SizedBox(height: 8),
+          _buildNiveauBadge(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildNiveauBadge() {
+    final niveau = ref.watch(gamificationProvider).niveau;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: _orange.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: _orange.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.military_tech_rounded, color: _orange, size: 16),
+          const SizedBox(width: 4),
+          Text(
+            'Niveau $niveau',
+            style: const TextStyle(
+              color: _orange,
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+            ),
+          ),
         ],
       ),
     );
@@ -190,7 +222,7 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
       children: [
         Expanded(child: _statCard(Icons.report_problem_outlined, '$signalementCount', 'Signalements', _orange)),
         const SizedBox(width: 10),
-        Expanded(child: _statCard(Icons.emoji_events_outlined, '$actionCount', 'Actions', const Color(0xFF3B6D11))),
+        Expanded(child: _statCard(Icons.military_tech_outlined, '${ref.watch(gamificationProvider).niveau}', 'Niveau', const Color(0xFF3B6D11))),
         const SizedBox(width: 10),
         Expanded(child: _statCard(Icons.star_rounded, '${ref.watch(gamificationProvider).totalPoints}', 'Points', _orange)),
       ],

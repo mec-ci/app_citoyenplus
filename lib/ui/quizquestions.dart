@@ -144,7 +144,9 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
     final totalPoints = _currentScore;
     final passed = pct >= 60;
 
-    ref.read(gamificationProvider.notifier).addPoints(totalPoints);
+    ref
+        .read(gamificationProvider.notifier)
+        .addPoints(totalPoints, raison: 'quiz:${widget.categorie}:niveau${widget.level}');
 
     Navigator.pushReplacement(
       context,
