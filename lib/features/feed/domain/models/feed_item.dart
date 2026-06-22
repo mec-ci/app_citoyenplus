@@ -14,6 +14,8 @@ class FeedItem {
   final String? sourceInstitution;
   final String? slug;
   final String? categorieNom;
+  final double? latitude;
+  final double? longitude;
   final DateTime createdAt;
   final int? likesCount;
   final int? commentsCount;
@@ -33,6 +35,8 @@ class FeedItem {
     this.sourceInstitution,
     this.slug,
     this.categorieNom,
+    this.latitude,
+    this.longitude,
     required this.createdAt,
     this.likesCount,
     this.commentsCount,

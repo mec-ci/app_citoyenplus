@@ -1,14 +1,16 @@
 import 'dart:io';
 
 import 'package:citoyen_plus/features/feed/data/repositories/signalement_repository.dart';
+import 'package:citoyen_plus/features/feed/presentation/pages/pick_location_map_page.dart';
 import 'package:citoyen_plus/features/feed/presentation/providers/categorie_signalement_provider.dart';
 import 'package:citoyen_plus/features/feed/presentation/providers/signalement_provider.dart';
 import 'package:citoyen_plus/models/categorie_signalement_model.dart';
+import 'package:citoyen_plus/services/nominatim_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:latlong2/latlong.dart';
 
 class CreateSignalementPage extends ConsumerStatefulWidget {
   const CreateSignalementPage({super.key});
@@ -91,9 +93,13 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
     );
   }
 
+  bool _locating = false;
+
+  /// Détecte rapidement la position GPS et remplit l'adresse via Nominatim.
   Future<void> _detectLocation() async {
     setState(() {
       _locationError = null;
+      _locating = true;
     });
 
     try {
@@ -120,25 +126,45 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
           accuracy: LocationAccuracy.high,
         ),
       );
-      final placemarks = await placemarkFromCoordinates(
+      final address = await NominatimService.reverse(
         position.latitude,
         position.longitude,
       );
-      final address = placemarks.isNotEmpty
-          ? '${placemarks.first.street ?? ''} ${placemarks.first.locality ?? ''}'
-                .trim()
-          : '';
 
+      if (!mounted) return;
       setState(() {
         _latitude = position.latitude;
         _longitude = position.longitude;
-        _adresseController.text = address.isNotEmpty
-            ? address
-            : _adresseController.text;
+        if (address != null && address.isNotEmpty) {
+          _adresseController.text = address;
+        }
       });
     } catch (e) {
       setState(() => _locationError = 'Impossible de detecter la position.');
+    } finally {
+      if (mounted) setState(() => _locating = false);
     }
+  }
+
+  /// Ouvre la carte OpenStreetMap pour choisir la position manuellement.
+  Future<void> _pickOnMap() async {
+    final initial = (_latitude != null && _longitude != null)
+        ? LatLng(_latitude!, _longitude!)
+        : null;
+    final result = await Navigator.of(context).push<LocationPickResult>(
+      MaterialPageRoute(
+        builder: (_) => PickLocationMapPage(initial: initial),
+      ),
+    );
+    if (result == null || !mounted) return;
+    setState(() {
+      _locationError = null;
+      _latitude = result.latitude;
+      _longitude = result.longitude;
+      if (result.adresse != null && result.adresse!.isNotEmpty) {
+        _adresseController.text = result.adresse!;
+      }
+    });
   }
 
   Future<void> _submit() async {
@@ -274,13 +300,9 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _adresseController,
-                decoration: InputDecoration(
+                decoration: const InputDecoration(
                   labelText: 'Adresse',
-                  border: const OutlineInputBorder(),
-                  suffixIcon: IconButton(
-                    icon: const Icon(Icons.location_on),
-                    onPressed: _detectLocation,
-                  ),
+                  border: OutlineInputBorder(),
                 ),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
@@ -289,6 +311,51 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
                   return null;
                 },
               ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _locating ? null : _detectLocation,
+                      icon: _locating
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.my_location, size: 18),
+                      label: const Text('Ma position'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickOnMap,
+                      icon: const Icon(Icons.map_outlined, size: 18),
+                      label: const Text('Carte'),
+                    ),
+                  ),
+                ],
+              ),
+              if (_latitude != null && _longitude != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.check_circle,
+                        color: Color(0xFF34C759), size: 16),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Position définie : '
+                        '${_latitude!.toStringAsFixed(5)}, '
+                        '${_longitude!.toStringAsFixed(5)}',
+                        style: const TextStyle(
+                            fontSize: 12, color: Colors.black54),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               if (_locationError != null) ...[
                 const SizedBox(height: 8),
                 Text(
