@@ -13,6 +13,7 @@ class ApiEndpoints {
   static const String categorieSignalement = '/categorie-signalement';
 
   static const String actualites = '/actualites';
+  static String actualiteById(String id) => '/actualites/$id';
 
   // ── Réactions (likes) ──────────────────────────────────────────────────────
   static String signalementReactionToggle(String id) =>
