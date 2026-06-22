@@ -76,6 +76,15 @@ class ApiService {
         .toList();
   }
 
+  /// Récupère une actualité complète (avec son `content`) par son identifiant
+  /// via `GET /actualites/:id`.
+  static Future<PostModel> fetchPostById(String id) async {
+    final response = await _dio.get(ApiEndpoints.actualiteById(id));
+    final data = response.data;
+    final item = data is Map<String, dynamic> ? data['data'] ?? data : data;
+    return PostModel.fromJson((item as Map).cast<String, dynamic>());
+  }
+
   static Future<List<SignalementModel>> fetchSignalements({
     int page = 1,
     int limit = 20,
