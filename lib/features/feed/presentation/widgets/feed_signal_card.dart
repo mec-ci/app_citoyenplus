@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:citoyen_plus/features/feed/domain/models/feed_item.dart';
+import 'package:citoyen_plus/features/feed/presentation/pages/signalement_detail_view.dart';
 import 'package:citoyen_plus/services/commentaire_service.dart';
 import 'package:citoyen_plus/services/reaction_service.dart';
 import 'package:citoyen_plus/widgets/commentaires_sheet.dart';
@@ -132,8 +133,11 @@ class _FeedSignalCardState extends State<FeedSignalCard> {
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('${widget.item.titre} (details a venir)')),
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => SignalementDetailView(item: widget.item),
+            ),
           );
         },
         child: Container(

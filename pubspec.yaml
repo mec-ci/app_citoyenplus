@@ -43,7 +43,8 @@ dependencies:
   http: ^1.6.0
   share_plus: ^10.0.0
   geolocator: ^14.0.2
-  geocoding: ^2.1.1
+  flutter_map: ^7.0.2
+  latlong2: ^0.9.1
   dio: ^5.4.0
   flutter_riverpod: ^2.5.1
   cached_network_image: ^3.3.1

@@ -1,11 +1,39 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:citoyen_plus/features/feed/domain/models/feed_item.dart';
 import 'package:citoyen_plus/features/feed/domain/models/signalement.dart';
+import 'package:citoyen_plus/features/feed/presentation/pages/signalement_detail_view.dart';
 import 'package:flutter/material.dart';
 
 class SignalementCard extends StatelessWidget {
   final Signalement signalement;
 
   const SignalementCard({super.key, required this.signalement});
+
+  /// Convertit le signalement en FeedItem pour réutiliser l'écran de détail.
+  FeedItem _toFeedItem() {
+    return FeedItem(
+      type: FeedType.signalement,
+      id: signalement.id,
+      titre: signalement.titre,
+      description: signalement.description,
+      imageUrl: signalement.photo,
+      adresse: signalement.adresse,
+      statut: signalement.statut,
+      latitude: signalement.latitude,
+      longitude: signalement.longitude,
+      categorieNom: signalement.categorie?.nom,
+      createdAt: signalement.createdAt,
+    );
+  }
+
+  void _openDetail(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => SignalementDetailView(item: _toFeedItem()),
+      ),
+    );
+  }
 
   String get _statusLabel {
     switch (signalement.statut.toUpperCase()) {
@@ -77,7 +105,9 @@ class SignalementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    return GestureDetector(
+      onTap: () => _openDetail(context),
+      child: Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
@@ -284,6 +314,7 @@ class SignalementCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
       ),
     );
   }

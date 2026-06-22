@@ -4,6 +4,7 @@ import 'package:citoyen_plus/features/feed/presentation/providers/feed_provider.
 import 'package:citoyen_plus/features/feed/presentation/providers/signalement_provider.dart';
 import 'package:citoyen_plus/features/feed/presentation/widgets/feed_action_card.dart';
 import 'package:citoyen_plus/features/feed/presentation/widgets/feed_actualite_card.dart';
+import 'package:citoyen_plus/features/feed/presentation/pages/signalements_map_page.dart';
 import 'package:citoyen_plus/features/feed/presentation/widgets/feed_signal_card.dart';
 import 'package:citoyen_plus/features/feed/presentation/widgets/feed_shimmer.dart';
 import 'package:citoyen_plus/features/feed/presentation/widgets/signalement_card.dart';
@@ -248,18 +249,53 @@ class _FeedPageState extends ConsumerState<FeedPage>
     }
 
     if (state.items.isEmpty) {
-      return const Center(child: Text('Aucun signalement trouve.'));
+      return Column(
+        children: [
+          _buildMapButton(),
+          const Expanded(
+            child: Center(child: Text('Aucun signalement trouve.')),
+          ),
+        ],
+      );
     }
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 10),
-        itemCount: state.items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (context, index) {
-          return SignalementCard(signalement: state.items[index]);
-        },
+      child: Column(
+        children: [
+          _buildMapButton(),
+          Expanded(
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              itemCount: state.items.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                return SignalementCard(signalement: state.items[index]);
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMapButton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: SizedBox(
+        width: double.infinity,
+        child: OutlinedButton.icon(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: const Color(0xFFE65C00),
+            side: const BorderSide(color: Color(0xFFE65C00)),
+          ),
+          onPressed: () => Navigator.push(
+            context,
+            MaterialPageRoute(builder: (_) => const SignalementsMapPage()),
+          ),
+          icon: const Icon(Icons.map_outlined, size: 18),
+          label: const Text('Voir les signalements à proximité'),
+        ),
       ),
     );
   }

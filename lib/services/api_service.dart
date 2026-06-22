@@ -89,9 +89,19 @@ class ApiService {
     int page = 1,
     int limit = 20,
     String? citoyenId,
+    double? latitude,
+    double? longitude,
+    double? radiusKm,
   }) async {
     final query = <String, dynamic>{'page': page, 'limit': limit};
     if (citoyenId != null) query['citoyenId'] = citoyenId;
+    // Recherche « autour de moi » : envoyée au backend (filtre par rayon + tri
+    // par distance) lorsque coordonnées et rayon sont fournis.
+    if (latitude != null && longitude != null && radiusKm != null) {
+      query['latitude'] = latitude;
+      query['longitude'] = longitude;
+      query['radiusKm'] = radiusKm;
+    }
 
     final response = await _dio.get(
       ApiEndpoints.signalementCitoyen,

@@ -74,6 +74,8 @@ class FeedNotifier extends StateNotifier<FeedState> {
       createdAt: s.createdAt ?? DateTime.now(),
       statut: s.statut,
       adresse: s.adresse,
+      latitude: s.latitude,
+      longitude: s.longitude,
       categorieNom: s.categorie?.nom,
       likesCount: s.likesCount,
       commentsCount: s.commentsCount,
