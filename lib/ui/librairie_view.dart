@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../services/api_service.dart';
 import 'detail_page.dart';
 import 'regions_page.dart';
@@ -267,17 +266,16 @@ class _LibrairieViewState extends State<LibrairieView>
         final rawUrl = doc['pdf'] ?? doc['url'] ?? doc['documentUrl'] ?? '';
 
         return GestureDetector(
-          onTap: () async {
-            if (rawUrl.isNotEmpty) {
-              final uri = Uri.tryParse(rawUrl);
-              if (uri != null &&
-                  (uri.isScheme('http') || uri.isScheme('https'))) {
-                await launchUrl(uri);
-                return;
-              }
+          onTap: () {
+            if (rawUrl.toString().isNotEmpty) {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => LivrePdfView(pdf: rawUrl)),
+                MaterialPageRoute(
+                  builder: (_) => LivrePdfView(
+                    pdf: rawUrl.toString(),
+                    title: title.toString(),
+                  ),
+                ),
               );
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
