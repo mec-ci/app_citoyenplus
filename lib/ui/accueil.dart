@@ -3,7 +3,6 @@ import 'package:citoyen_plus/ui/mes_actions_view.dart';
 import 'package:citoyen_plus/ui/notifications_view.dart';
 import 'package:citoyen_plus/ui/profil_view.dart';
 import 'package:citoyen_plus/ui/search_view.dart';
-import 'package:citoyen_plus/widgets/poster_action.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../features/feed/presentation/pages/create_signalement_page.dart';
@@ -143,21 +142,6 @@ class HomeState extends State<Home> {
                     ),
                   ),
                 );
-              },
-            ),
-            const SizedBox(height: 12),
-            _OptionTile(
-              icon: Icons.article_outlined,
-              iconColor: const Color(0xFF1556B5),
-              title: 'Poster une actualité',
-              subtitle: 'Publier une information citoyenne',
-              onTap: () {
-                Navigator.pop(context);
-                showPosterActionSheet(context, () {
-                  ProviderScope.containerOf(
-                    context,
-                  ).read(feedProvider.notifier).refresh();
-                });
               },
             ),
           ],
