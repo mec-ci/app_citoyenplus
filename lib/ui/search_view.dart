@@ -7,6 +7,7 @@ import 'package:citoyen_plus/services/api_service.dart';
 import 'package:citoyen_plus/widgets/publication_card.dart';
 import 'package:citoyen_plus/widgets/commentaires_sheet.dart';
 import 'package:citoyen_plus/services/commentaire_service.dart';
+import 'package:citoyen_plus/services/reaction_service.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'detail_page.dart';
 import 'livre_pdf_view.dart';
@@ -181,7 +182,17 @@ class _SearchViewState extends State<SearchView> {
                           : CommentaireCible.actualite,
                       id: pub.id,
                     ),
-                    onLike: () {},
+                    onLike: () async {
+                      // Persiste le like au backend (l'UI a déjà été mise à
+                      // jour de façon optimiste par la carte). Best-effort.
+                      try {
+                        if (pub.type == 'signalement') {
+                          await ReactionService.toggleSignalement(pub.id);
+                        } else {
+                          await ReactionService.toggleActualite(pub.id);
+                        }
+                      } catch (_) {}
+                    },
                   )),
               const SizedBox(height: 16),
             ],
