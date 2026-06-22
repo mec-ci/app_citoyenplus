@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/gamification_provider.dart';
-import '../features/auth/presentation/providers/auth_provider.dart';
 import '../services/api_service.dart';
 import '../services/user_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,6 +16,14 @@ const _red = Color(0xFFFF2D55);
 class Quizquestions extends ConsumerStatefulWidget {
   final String categorie;
   final int level;
+
+  /// Identifiant RÉEL du quiz côté API (UUID). `null` en mode hors-ligne
+  /// (banque locale) : la soumission serveur est alors impossible et le
+  /// résultat n'est pas envoyé.
+  final String? quizId;
+
+  /// Questions au format map. Chaque entrée peut porter les vrais identifiants
+  /// (`questionId`, `choiceIds`) lorsque les questions viennent de l'API.
   final List<Map<String, dynamic>> questions;
   final Future<void> Function(bool passed)? onLevelCompleted;
 
@@ -22,6 +31,7 @@ class Quizquestions extends ConsumerStatefulWidget {
     super.key,
     required this.categorie,
     required this.level,
+    this.quizId,
     required this.questions,
     this.onLevelCompleted,
   });
@@ -85,8 +95,11 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
       selectedAnswer = -1;
     });
     _timePerQuestion.add(_maxSeconds.toDouble());
+    final q = widget.questions[questionIndex];
     _answers.add({
       'questionId': questionIndex,
+      'questionRealId': q['questionId'],
+      'choiceRealId': null, // aucune réponse (temps écoulé)
       'selectedChoice': -1,
       'isCorrect': false,
       'timeSpent': _maxSeconds,
@@ -115,8 +128,17 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
       _currentScore += pointsGained;
     });
 
+    final q = widget.questions[questionIndex];
+    final choiceIds = q['choiceIds'];
+    final String? choiceRealId =
+        (choiceIds is List && index >= 0 && index < choiceIds.length)
+            ? choiceIds[index]?.toString()
+            : null;
+
     _answers.add({
       'questionId': questionIndex,
+      'questionRealId': q['questionId'],
+      'choiceRealId': choiceRealId,
       'selectedChoice': index,
       'isCorrect': isCorrect,
       'timeSpent': timeSpent,
@@ -147,17 +169,12 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
     final totalPoints = _currentScore;
     final passed = pct >= 60;
 
-    // Gain de points via la gamification (synchronisé au backend en LOT A).
-    if (totalPoints > 0) {
-      ref.read(gamificationProvider.notifier).addPoints(
-            totalPoints,
-            raison: 'quiz:${widget.categorie}:niveau${widget.level}',
-          );
-    }
+    ref
+        .read(gamificationProvider.notifier)
+        .addPoints(totalPoints, raison: 'quiz:${widget.categorie}:niveau${widget.level}');
 
-    // Persistance du résultat côté serveur (POST /quizz/submit) avec l'userId
-    // de l'utilisateur connecté. Best-effort : ne bloque pas l'affichage.
-    _submitResult(total);
+    // Persiste le résultat du quiz côté serveur (best-effort, repli local).
+    _submitQuizResult();
 
     Navigator.pushReplacement(
       context,
@@ -177,37 +194,77 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
     );
   }
 
-  /// Récupère l'userId (auth provider en priorité, sinon profil serveur) et
-  /// envoie le résultat du quiz au backend. Best-effort : les erreurs réseau
-  /// sont silencieuses, le cache local de progression reste le repli.
-  Future<void> _submitResult(int total) async {
-    String? userId = _userIdFromAuth();
-    userId ??= await UserService.currentUserId();
-    if (userId == null || userId.isEmpty) return;
+  /// Soumet le résultat au backend `POST /quizz/submit` avec :
+  /// - le VRAI `quizId` (UUID renvoyé par l'API),
+  /// - le `userId` de l'utilisateur connecté,
+  /// - `answers` = `[{ questionId: <vrai id>, choiceId: <vrai id du choix> }]`.
+  ///
+  /// En cas d'échec (hors-ligne / erreur réseau), le résultat est mis en file
+  /// d'attente locale (`pending_quiz_results`) pour un renvoi ultérieur.
+  Future<void> _submitQuizResult() async {
+    final quizId = widget.quizId;
 
-    await ApiService.postQuizResult(
-      userId: userId,
-      quizId: '${widget.categorie}-niveau${widget.level}',
-      score: correctCount,
-      total: total,
-      answers: _answers,
-      timePerQuestion: _timePerQuestion,
-    );
+    // Construit la soumission à partir des VRAIS identifiants des questions et
+    // des choix. On ignore les réponses sans choix sélectionné (temps écoulé)
+    // ou dépourvues d'identifiants (questions hors banque API).
+    final payloadAnswers = <Map<String, dynamic>>[];
+    for (final a in _answers) {
+      final questionRealId = a['questionRealId'];
+      final choiceRealId = a['choiceRealId'];
+      if (questionRealId == null || choiceRealId == null) continue;
+      payloadAnswers.add({
+        'questionId': questionRealId.toString(),
+        'choiceId': choiceRealId.toString(),
+      });
+    }
+
+    // Pas de quizId réel (mode hors-ligne / banque locale) ou aucune réponse
+    // exploitable : impossible de soumettre au serveur.
+    if (quizId == null || quizId.isEmpty || payloadAnswers.isEmpty) return;
+
+    final userId = await UserService.currentUserId();
+    if (userId == null) {
+      await _cachePendingResult(quizId, payloadAnswers, userId: null);
+      return;
+    }
+
+    try {
+      final result = await ApiService.postQuizResult(
+        userId: userId,
+        quizId: quizId,
+        answers: payloadAnswers,
+      );
+      if (result == null) {
+        await _cachePendingResult(quizId, payloadAnswers, userId: userId);
+      }
+    } catch (_) {
+      // Repli local : on conserve le résultat pour un renvoi ultérieur.
+      await _cachePendingResult(quizId, payloadAnswers, userId: userId);
+    }
   }
 
-  String? _userIdFromAuth() {
-    final data = ref.read(authProvider).userData;
-    if (data == null) return null;
-    final user = data['user'] is Map ? data['user'] as Map : data;
-    final id = user['id'] ?? user['_id'] ?? user['userId'];
-    final str = id?.toString();
-    return (str != null && str.isNotEmpty) ? str : null;
+  Future<void> _cachePendingResult(
+    String quizId,
+    List<Map<String, dynamic>> answers, {
+    required String? userId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    const key = 'pending_quiz_results';
+    final list = prefs.getStringList(key) ?? <String>[];
+    list.add(jsonEncode({
+      'userId': userId,
+      'quizId': quizId,
+      'answers': answers,
+      'savedAt': DateTime.now().toIso8601String(),
+    }));
+    await prefs.setStringList(key, list);
   }
 
   @override
   Widget build(BuildContext context) {
     final question = widget.questions[questionIndex];
-    final int correct = question['correct'];
+    final int correct = (question['correct'] as int?) ?? -1;
+    final List options = (question['options'] as List?) ?? const [];
     final int total = widget.questions.length;
     final double progress = (questionIndex + 1) / total;
     final double timerValue = _secondsRemaining / _maxSeconds;
@@ -365,7 +422,7 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
             Expanded(
               child: ListView.builder(
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: 4,
+                itemCount: options.length,
                 itemBuilder: (context, i) {
                   final bool isSelected = selectedAnswer == i;
                   final bool isCorrectAnswer = i == correct;
@@ -429,7 +486,7 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
                             ),
                             child: Center(
                               child: Text(
-                                ['A', 'B', 'C', 'D'][i],
+                                String.fromCharCode(65 + i),
                                 style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w800,
@@ -440,7 +497,7 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              question['options'][i],
+                              options[i].toString(),
                               style: TextStyle(
                                   fontSize: 14,
                                   color: textColor,

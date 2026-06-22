@@ -25,7 +25,6 @@ class LoginViewState extends State<LoginView> {
   final TextEditingController emailCtrl = TextEditingController();
   final TextEditingController passwordCtrl = TextEditingController();
   bool isLoading = false;
-  bool isGoogleLoading = false;
   bool hidePassword = true;
 
   @override
@@ -67,37 +66,6 @@ class LoginViewState extends State<LoginView> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(result["message"]),
-          backgroundColor: const Color(0xFFFF2D55),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-    }
-  }
-
-  Future<void> handleGoogleLogin() async {
-    setState(() => isGoogleLoading = true);
-    final result = await AuthService.loginWithGoogle();
-    if (!mounted) return;
-    setState(() => isGoogleLoading = false);
-    if (result["success"]) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("✅ Connexion Google réussie"),
-          backgroundColor: const Color(0xFF34C759),
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-      );
-      await _navigateAfterLogin();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result["message"] ?? 'Erreur connexion Google'),
           backgroundColor: const Color(0xFFFF2D55),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -302,38 +270,6 @@ class LoginViewState extends State<LoginView> {
                               color: Colors.white,
                             ),
                           ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  height: 52,
-                  child: OutlinedButton.icon(
-                    onPressed: isGoogleLoading ? null : handleGoogleLogin,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.black87,
-                      backgroundColor: Colors.white,
-                      side: BorderSide(color: Colors.grey.shade300),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    icon: isGoogleLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.login, size: 20, color: Colors.red),
-                    label: Text(
-                      isGoogleLoading
-                          ? 'Connexion Google...'
-                          : 'Continuer avec Google',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w700,
-                        fontSize: 15,
-                      ),
-                    ),
                   ),
                 ),
                 const SizedBox(height: 32),

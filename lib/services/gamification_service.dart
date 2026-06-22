@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import '../core/network/dio_client.dart';
 import '../core/network/api_endpoints.dart';
 
-/// Un badge obtenu par l'utilisateur dans le système de gamification.
+/// Un badge obtenu par l'utilisateur dans le cadre de la gamification.
 class GamificationBadge {
   final String code;
   final String label;
@@ -15,47 +15,42 @@ class GamificationBadge {
   });
 
   factory GamificationBadge.fromJson(Map<String, dynamic> json) {
-    final dateRaw = json['obtenuLe'] ?? json['obtenu_le'] ?? json['date'];
     return GamificationBadge(
-      code: (json['code'] ?? '').toString(),
-      label: json['label']?.toString() ??
-          json['libelle']?.toString() ??
-          json['code']?.toString() ??
-          '',
-      obtenuLe: dateRaw != null ? DateTime.tryParse(dateRaw.toString()) : null,
+      code: json['code']?.toString() ?? '',
+      label: json['label']?.toString() ?? '',
+      obtenuLe: json['obtenuLe'] != null
+          ? DateTime.tryParse(json['obtenuLe'].toString())
+          : null,
     );
   }
 }
 
-/// État de gamification de l'utilisateur connecté renvoyé par le backend.
-class GamificationState {
+/// État de gamification renvoyé par `GET /gamification/me`
+/// et `POST /gamification/points`.
+class GamificationMe {
   final int points;
   final int niveau;
   final List<GamificationBadge> badges;
 
-  const GamificationState({
-    this.points = 0,
-    this.niveau = 1,
+  const GamificationMe({
+    required this.points,
+    required this.niveau,
     this.badges = const [],
   });
 
-  factory GamificationState.fromJson(Map<String, dynamic> json) {
-    final badgesRaw = json['badges'];
-    final badges = badgesRaw is List
-        ? badgesRaw
-            .whereType<Map>()
-            .map((e) => GamificationBadge.fromJson(e.cast<String, dynamic>()))
-            .toList()
-        : <GamificationBadge>[];
-    return GamificationState(
+  factory GamificationMe.fromJson(Map<String, dynamic> json) {
+    final rawBadges = json['badges'] as List? ?? const [];
+    return GamificationMe(
       points: (json['points'] as num?)?.toInt() ?? 0,
-      niveau: (json['niveau'] as num?)?.toInt() ?? 1,
-      badges: badges,
+      niveau: (json['niveau'] as num?)?.toInt() ?? 0,
+      badges: rawBadges
+          .map((e) => GamificationBadge.fromJson((e as Map).cast<String, dynamic>()))
+          .toList(),
     );
   }
 }
 
-/// Une entrée du classement (leaderboard).
+/// Une entrée du classement renvoyé par `GET /gamification/leaderboard`.
 class LeaderboardEntry {
   final String userId;
   final String nom;
@@ -65,62 +60,57 @@ class LeaderboardEntry {
   const LeaderboardEntry({
     required this.userId,
     required this.nom,
-    this.points = 0,
-    this.niveau = 1,
+    required this.points,
+    required this.niveau,
   });
 
   factory LeaderboardEntry.fromJson(Map<String, dynamic> json) {
     return LeaderboardEntry(
-      userId: (json['userId'] ?? json['id'] ?? json['_id'] ?? '').toString(),
-      nom: json['nom']?.toString() ??
-          json['name']?.toString() ??
-          json['fullname']?.toString() ??
-          'Utilisateur',
+      userId: (json['userId'] ?? '').toString(),
+      nom: json['nom']?.toString() ?? 'Utilisateur',
       points: (json['points'] as num?)?.toInt() ?? 0,
-      niveau: (json['niveau'] as num?)?.toInt() ?? 1,
+      niveau: (json['niveau'] as num?)?.toInt() ?? 0,
     );
   }
 }
 
-/// Service d'accès au système de gamification (points, niveaux, badges).
+/// Service de gamification synchronisée avec le serveur.
 class GamificationService {
   static final Dio _dio = DioClient.getInstance();
 
   /// Récupère l'état de gamification de l'utilisateur connecté.
-  static Future<GamificationState> getMe() async {
+  static Future<GamificationMe> getMe() async {
     final response = await _dio.get(ApiEndpoints.gamificationMe);
-    final data = response.data;
-    final map = data is Map<String, dynamic>
-        ? (data['data'] is Map ? data['data'] : data)
+    final raw = response.data;
+    final map = raw is Map<String, dynamic>
+        ? (raw['data'] is Map ? (raw['data'] as Map).cast<String, dynamic>() : raw)
         : <String, dynamic>{};
-    return GamificationState.fromJson((map as Map).cast<String, dynamic>());
+    return GamificationMe.fromJson(map);
   }
 
   /// Ajoute des points pour une raison donnée et renvoie l'état mis à jour.
-  static Future<GamificationState> addPoints(int points, String raison) async {
+  static Future<GamificationMe> addPoints(int points, String raison) async {
     final response = await _dio.post(
       ApiEndpoints.gamificationPoints,
       data: {'points': points, 'raison': raison},
     );
-    final data = response.data;
-    final map = data is Map<String, dynamic>
-        ? (data['data'] is Map ? data['data'] : data)
+    final raw = response.data;
+    final map = raw is Map<String, dynamic>
+        ? (raw['data'] is Map ? (raw['data'] as Map).cast<String, dynamic>() : raw)
         : <String, dynamic>{};
-    return GamificationState.fromJson((map as Map).cast<String, dynamic>());
+    return GamificationMe.fromJson(map);
   }
 
-  /// Récupère le classement des utilisateurs.
+  /// Récupère le classement.
   static Future<List<LeaderboardEntry>> leaderboard({int limit = 20}) async {
     final response = await _dio.get(
       ApiEndpoints.gamificationLeaderboard,
       queryParameters: {'limit': limit},
     );
-    final data = response.data;
-    final items = data is Map<String, dynamic> ? data['data'] ?? data : data;
-    if (items is! List) return [];
-    return items
-        .whereType<Map>()
-        .map((e) => LeaderboardEntry.fromJson(e.cast<String, dynamic>()))
+    final raw = response.data;
+    final list = raw is Map<String, dynamic> ? (raw['data'] as List? ?? const []) : (raw as List? ?? const []);
+    return list
+        .map((e) => LeaderboardEntry.fromJson((e as Map).cast<String, dynamic>()))
         .toList();
   }
 }

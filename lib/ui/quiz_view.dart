@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../models/quiz.dart';
 import '../services/api_service.dart';
-import '../services/quiz_service.dart';
 import 'entete.dart';
 import 'quizquestions.dart';
 
@@ -9,39 +9,30 @@ const _orange = Color(0xFFE65C00);
 const _blue = Color(0xFF1556B5);
 const _green = Color(0xFF34C759);
 
-// ── Données des catégories ────────────────────────────────────────────────────
+// ── Mapping niveau → difficulté ────────────────────────────────────────────────
+// Le backend ne connaît pas la notion de « niveau » mais une `difficulte`.
+// On mappe : niveau 1 → FACILE, niveau 2 → MOYEN, niveau 3 → DIFFICILE.
+const List<String> _levelDifficultes = ['FACILE', 'MOYEN', 'DIFFICILE'];
 
-List<Map<String, dynamic>> _categories = [
-  {
-    "icon": Icons.flag_circle_outlined,
-    "title": "Citoyenneté",
-    "color": _orange,
-  },
-  {
-    "icon": Icons.directions_car_outlined,
-    "title": "Code de la route",
-    "color": _blue,
-  },
-  {"icon": Icons.public_outlined, "title": "Côte d'Ivoire", "color": _orange},
-  {"icon": Icons.gavel_outlined, "title": "Institutions", "color": _blue},
-  {"icon": Icons.scale_outlined, "title": "Droits humains", "color": _orange},
-  {
-    "icon": Icons.handshake_outlined,
-    "title": "Civisme et valeurs",
-    "color": _blue,
-  },
-  {
-    "icon": Icons.phone_android_outlined,
-    "title": "Citoyenneté numérique",
-    "color": _orange,
-  },
-  {"icon": Icons.eco_outlined, "title": "Environnement", "color": _green},
-  {
-    "icon": Icons.how_to_vote_outlined,
-    "title": "Responsabilité civique",
-    "color": _blue,
-  },
-];
+String _difficulteForLevel(int level) =>
+    _levelDifficultes[(level - 1).clamp(0, 2)];
+
+/// Convertit les questions d'un [ApiQuiz] dans le format de map consommé par
+/// [Quizquestions], en conservant les VRAIS identifiants pour la soumission :
+/// - `questionId` : id réel de la question
+/// - `choiceIds`  : ids réels des choix (même ordre que `options`)
+/// - `correct`    : index (0-based) du choix correct, pour le feedback local
+List<Map<String, dynamic>> _apiQuizToQuestionMaps(ApiQuiz quiz) {
+  return quiz.questions.map((q) {
+    return <String, dynamic>{
+      'questionId': q.id,
+      'question': q.text,
+      'options': q.choices.map((c) => c.text).toList(),
+      'choiceIds': q.choices.map((c) => c.id).toList(),
+      'correct': q.correctIndex,
+    };
+  }).toList();
+}
 
 // ── Vue principale Quiz ───────────────────────────────────────────────────────
 
@@ -64,28 +55,21 @@ class QuizView extends StatefulWidget {
 class _QuizViewState extends State<QuizView> {
   Map<String, Map<int, bool>> _progress = {};
   bool _isLoadingCategories = true;
-  String? _categoriesError;
 
-  /// Questions issues de l'API regroupées par titre de catégorie puis par
-  /// niveau (1..3). Vide si l'API a échoué : on retombe alors sur la banque
-  /// de questions locale (fallback hors-ligne explicite).
-  Map<String, Map<int, List<Map<String, dynamic>>>> _apiQuestions = {};
+  /// Mode hors-ligne : l'API n'a pas répondu (réseau). On utilise alors la
+  /// banque de questions locale (`_questionBank`) comme repli explicite.
+  bool _offline = false;
+
+  /// Catégories affichées dans la grille. Chaque entrée :
+  /// `{ title, icon, color, quizzesByLevel: Map<int, ApiQuiz> }`.
+  /// `quizzesByLevel` est vide en mode hors-ligne (la banque locale est alors
+  /// utilisée pour fournir les questions).
+  List<Map<String, dynamic>> _categories = [];
 
   @override
   void initState() {
     super.initState();
-    _loadProgress();
     _loadCategories();
-  }
-
-  /// Traduit une difficulté API en niveau (1..3).
-  int _levelForDifficulte(dynamic difficulte) {
-    final d = (difficulte ?? '').toString().toUpperCase();
-    if (d.contains('MOYEN') || d.contains('INTERM')) return 2;
-    if (d.contains('AVANC') || d.contains('DIFFIC') || d.contains('HARD')) {
-      return 3;
-    }
-    return 1;
   }
 
   Future<void> _loadProgress() async {
@@ -105,63 +89,87 @@ class _QuizViewState extends State<QuizView> {
   Future<void> _loadCategories() async {
     setState(() {
       _isLoadingCategories = true;
-      _categoriesError = null;
     });
     try {
-      // Source par défaut : l'API. fetchQuizCategories / fetchQuizzes retombent
-      // déjà sur les mocks en cas d'échec réseau (fallback hors-ligne explicite).
-      final categories = await ApiService.fetchQuizCategories();
-      final quizzes = await ApiService.fetchQuizzes();
+      // 1) Tentative API : on charge les VRAIS quiz et on les groupe par
+      //    catégorie (via `categorie.id`, ou à défaut le nom).
+      final quizzes = await ApiService.fetchQuizzes(limit: 50);
       if (!mounted) return;
-
-      // Lien id de catégorie -> titre, pour rattacher les quiz aux catégories.
-      final idToTitle = <String, String>{};
-      final mappedCategories =
-          categories.asMap().entries.map<Map<String, dynamic>>((entry) {
-        final index = entry.key;
-        final item = entry.value;
-        final title =
-            (item['titre'] ?? item['title'] ?? item['name'] ?? 'Thème ${index + 1}')
-                .toString();
-        final id = (item['id'] ?? item['_id'] ?? '').toString();
-        if (id.isNotEmpty) idToTitle[id] = title;
-        return <String, dynamic>{
-          'title': title,
-          'icon': _categoryIconForIndex(index),
-          'color': index.isEven ? _orange : _blue,
-        };
-      }).toList();
-
-      // Construit les questions par catégorie/niveau depuis les quiz API.
-      final apiQuestions = <String, Map<int, List<Map<String, dynamic>>>>{};
-      for (final quiz in quizzes) {
-        final catId = (quiz['categorieId'] ?? quiz['categoryId'] ?? '').toString();
-        final title = idToTitle[catId];
-        if (title == null) continue;
-        final level = _levelForDifficulte(quiz['difficulte'] ?? quiz['difficulty']);
-        final rawQuestions = quiz['questions'];
-        if (rawQuestions is! List) continue;
-        final mapped = rawQuestions
-            .whereType<Map>()
-            .map((q) => QuizService.mapApiQuestion(q.cast<String, dynamic>()))
-            .whereType<Map<String, dynamic>>()
-            .toList();
-        if (mapped.isEmpty) continue;
-        apiQuestions.putIfAbsent(title, () => {})[level] = mapped;
-      }
-
       setState(() {
-        _categories = mappedCategories;
-        _apiQuestions = apiQuestions;
+        _offline = false;
+        _categories = _buildCategoriesFromQuizzes(quizzes);
         _isLoadingCategories = false;
       });
+      await _loadProgress();
     } catch (_) {
+      // 2) Repli hors-ligne EXPLICITE : la banque locale `_questionBank`.
       if (!mounted) return;
       setState(() {
-        _categoriesError = 'Impossible de charger les catégories de quiz';
+        _offline = true;
+        _categories = _buildCategoriesFromLocalBank();
         _isLoadingCategories = false;
       });
+      await _loadProgress();
     }
+  }
+
+  /// Groupe les quiz de l'API par catégorie et construit les descripteurs de
+  /// la grille. La clé de regroupement est `categorie.id` lorsqu'elle est
+  /// disponible, sinon le nom de la catégorie.
+  List<Map<String, dynamic>> _buildCategoriesFromQuizzes(
+    List<ApiQuiz> quizzes,
+  ) {
+    // Regroupement en préservant l'ordre d'apparition.
+    final Map<String, List<ApiQuiz>> groups = {};
+    final Map<String, String> groupTitle = {};
+    for (final q in quizzes) {
+      final key = q.categorieId.isNotEmpty ? q.categorieId : q.categorieNom;
+      if (key.isEmpty) continue;
+      groups.putIfAbsent(key, () => []).add(q);
+      groupTitle.putIfAbsent(
+        key,
+        () => q.categorieNom.isNotEmpty ? q.categorieNom : q.title,
+      );
+    }
+
+    final result = <Map<String, dynamic>>[];
+    var index = 0;
+    for (final entry in groups.entries) {
+      final quizzesByLevel = <int, ApiQuiz>{};
+      for (var level = 1; level <= 3; level++) {
+        final wanted = _difficulteForLevel(level);
+        // On ne retient qu'un quiz NON VIDE pour cette difficulté.
+        final match = entry.value
+            .where((q) => q.difficulte == wanted && q.questions.isNotEmpty);
+        if (match.isNotEmpty) quizzesByLevel[level] = match.first;
+      }
+      // Catégorie sans aucun niveau jouable : on ne l'affiche pas.
+      if (quizzesByLevel.isEmpty) continue;
+      result.add({
+        'title': groupTitle[entry.key] ?? 'Thème ${index + 1}',
+        'icon': _categoryIconForIndex(index),
+        'color': index.isEven ? _orange : _blue,
+        'quizzesByLevel': quizzesByLevel,
+      });
+      index++;
+    }
+    return result;
+  }
+
+  /// Construit les descripteurs de catégorie à partir de la banque locale
+  /// (repli hors-ligne). Les questions seront fournies par
+  /// `getQuestionsForCategoryAndLevel`.
+  List<Map<String, dynamic>> _buildCategoriesFromLocalBank() {
+    final titles = _questionBank.keys.toList();
+    return titles.asMap().entries.map((entry) {
+      final index = entry.key;
+      return {
+        'title': entry.value,
+        'icon': _categoryIconForIndex(index),
+        'color': index.isEven ? _orange : _blue,
+        'quizzesByLevel': <int, ApiQuiz>{},
+      };
+    }).toList();
   }
 
   IconData _categoryIconForIndex(int index) {
@@ -251,15 +259,21 @@ class _QuizViewState extends State<QuizView> {
                 const Expanded(
                   child: Center(child: CircularProgressIndicator()),
                 )
-              else if (_categoriesError != null)
+              else if (_categories.isEmpty)
+                // L'API a répondu mais ne contient aucun quiz : état vide
+                // explicite (pas de repli mock, qui est réservé au hors-ligne).
                 Expanded(
                   child: Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        Icon(Icons.quiz_outlined,
+                            size: 48, color: Colors.grey[400]),
+                        const SizedBox(height: 12),
                         Text(
-                          _categoriesError!,
-                          style: const TextStyle(color: Colors.red),
+                          'Aucun quiz disponible pour le moment',
+                          style: TextStyle(color: Colors.grey[600]),
+                          textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 12),
                         ElevatedButton(
@@ -267,7 +281,7 @@ class _QuizViewState extends State<QuizView> {
                           style: ElevatedButton.styleFrom(
                             backgroundColor: _orange,
                           ),
-                          child: const Text('Réessayer'),
+                          child: const Text('Actualiser'),
                         ),
                       ],
                     ),
@@ -292,6 +306,10 @@ class _QuizViewState extends State<QuizView> {
                       final completed = _completedLevels(title);
                       final unlocked = _unlockedLevel(title);
 
+                      final quizzesByLevel =
+                          (cat['quizzesByLevel'] as Map<int, ApiQuiz>?) ??
+                              const {};
+
                       return GestureDetector(
                         onTap: () async {
                           await Navigator.push(
@@ -304,7 +322,8 @@ class _QuizViewState extends State<QuizView> {
                                 unlockedLevel: unlocked,
                                 completedLevels: _progress[title] ?? {},
                                 onProgressChanged: _loadProgress,
-                                apiQuestionsByLevel: _apiQuestions[title],
+                                quizzesByLevel: quizzesByLevel,
+                                offline: _offline,
                               ),
                             ),
                           );
@@ -420,9 +439,13 @@ class QuizLevelView extends StatelessWidget {
   final Map<int, bool> completedLevels;
   final VoidCallback onProgressChanged;
 
-  /// Questions chargées depuis l'API, par niveau (1..3). Si null ou si un
-  /// niveau est absent, on retombe sur la banque de questions locale.
-  final Map<int, List<Map<String, dynamic>>>? apiQuestionsByLevel;
+  /// Quiz réels de l'API associés à cette catégorie, indexés par niveau
+  /// (1→FACILE, 2→MOYEN, 3→DIFFICILE). Un niveau absent = indisponible.
+  /// Vide en mode hors-ligne (la banque locale fournit alors les questions).
+  final Map<int, ApiQuiz> quizzesByLevel;
+
+  /// Mode hors-ligne : les questions proviennent de la banque locale.
+  final bool offline;
 
   const QuizLevelView({
     super.key,
@@ -432,8 +455,15 @@ class QuizLevelView extends StatelessWidget {
     required this.unlockedLevel,
     required this.completedLevels,
     required this.onProgressChanged,
-    this.apiQuestionsByLevel,
+    this.quizzesByLevel = const {},
+    this.offline = false,
   });
+
+  /// Un niveau est « disponible » s'il existe un contenu jouable :
+  /// - hors-ligne : la banque locale est utilisée → toujours disponible ;
+  /// - en ligne : seulement si un quiz de la difficulté correspondante existe.
+  bool _isLevelAvailable(int level) =>
+      offline || quizzesByLevel[level] != null;
 
   static const _levelLabels = ["Débutant", "Intermédiaire", "Avancé"];
   static const _levelDesc = [
@@ -493,27 +523,31 @@ class QuizLevelView extends StatelessWidget {
             const SizedBox(height: 24),
             ...List.generate(3, (i) {
               final level = i + 1;
-              final isUnlocked = level <= unlockedLevel;
+              final isAvailable = _isLevelAvailable(level);
+              // Un niveau verrouillé (progression) ou indisponible (pas de
+              // quiz pour cette difficulté) n'est pas jouable.
+              final isUnlocked = level <= unlockedLevel && isAvailable;
               final isDone = completedLevels[level] == true;
+              // Débloqué par la progression mais sans contenu côté API.
+              final isUnavailable = level <= unlockedLevel && !isAvailable;
 
               return GestureDetector(
                 onTap: isUnlocked
                     ? () async {
+                        final apiQuiz = quizzesByLevel[level];
+                        // En ligne : questions/choix réels de l'API (avec
+                        // leurs vrais identifiants). Hors-ligne : banque locale.
+                        final questions = apiQuiz != null
+                            ? _apiQuizToQuestionMaps(apiQuiz)
+                            : getQuestionsForCategoryAndLevel(categorie, level);
                         await Navigator.push(
                           context,
                           MaterialPageRoute(
                             builder: (_) => Quizquestions(
                               categorie: categorie,
                               level: level,
-                              questions:
-                                  (apiQuestionsByLevel != null &&
-                                          apiQuestionsByLevel![level] != null &&
-                                          apiQuestionsByLevel![level]!.isNotEmpty)
-                                      ? apiQuestionsByLevel![level]!
-                                      : getQuestionsForCategoryAndLevel(
-                                          categorie,
-                                          level,
-                                        ),
+                              quizId: apiQuiz?.id,
+                              questions: questions,
                               onLevelCompleted: (passed) async {
                                 if (passed) {
                                   final prefs =
@@ -584,8 +618,10 @@ class QuizLevelView extends StatelessWidget {
                                           color: color,
                                         ),
                                       ))
-                              : const Icon(
-                                  Icons.lock_outline_rounded,
+                              : Icon(
+                                  isUnavailable
+                                      ? Icons.block_rounded
+                                      : Icons.lock_outline_rounded,
                                   color: Colors.grey,
                                   size: 22,
                                 ),
@@ -610,7 +646,9 @@ class QuizLevelView extends StatelessWidget {
                             Text(
                               isUnlocked
                                   ? _levelDesc[i]
-                                  : "Réussis le niveau ${level - 1} pour débloquer",
+                                  : isUnavailable
+                                      ? "Quiz indisponible pour ce niveau"
+                                      : "Réussis le niveau ${level - 1} pour débloquer",
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.grey[500],

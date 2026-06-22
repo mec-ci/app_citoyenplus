@@ -1,13 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../services/gamification_service.dart' as gs;
+import '../services/gamification_service.dart';
 
-/// État local du provider de gamification.
-///
-/// `totalPoints` / `niveau` reflètent la source serveur quand elle est
-/// disponible, sinon le cache SharedPreferences (mode hors-ligne).
-/// `pendingSyncPoints` accumule les points gagnés hors-ligne afin d'être
-/// envoyés au backend à la reconnexion.
 class GamificationState {
   final int totalPoints;
   final int niveau;
@@ -15,16 +9,14 @@ class GamificationState {
   final bool isSyncing;
   final int lastPointsGained;
   final bool showCelebration;
-  final List<gs.GamificationBadge> badges;
 
   const GamificationState({
     this.totalPoints = 0,
-    this.niveau = 1,
+    this.niveau = 0,
     this.pendingSyncPoints = 0,
     this.isSyncing = false,
     this.lastPointsGained = 0,
     this.showCelebration = false,
-    this.badges = const [],
   });
 
   GamificationState copyWith({
@@ -34,7 +26,6 @@ class GamificationState {
     bool? isSyncing,
     int? lastPointsGained,
     bool? showCelebration,
-    List<gs.GamificationBadge>? badges,
   }) {
     return GamificationState(
       totalPoints: totalPoints ?? this.totalPoints,
@@ -43,117 +34,113 @@ class GamificationState {
       isSyncing: isSyncing ?? this.isSyncing,
       lastPointsGained: lastPointsGained ?? this.lastPointsGained,
       showCelebration: showCelebration ?? this.showCelebration,
-      badges: badges ?? this.badges,
     );
   }
 }
 
 class GamificationNotifier extends StateNotifier<GamificationState> {
   GamificationNotifier() : super(const GamificationState()) {
-    _init();
+    _loadPoints();
   }
 
   static const _pointsKey = 'user_points';
   static const _niveauKey = 'user_niveau';
   static const _pendingKey = 'pending_sync_points';
 
-  /// Au démarrage : charge le cache local puis tente de rafraîchir depuis le
-  /// serveur (ne crashe pas hors-ligne).
-  Future<void> _init() async {
-    await _loadCache();
-    await refresh();
-  }
-
-  Future<void> _loadCache() async {
+  /// Au démarrage : on lit d'abord le cache local (offline-first),
+  /// puis on tente de se synchroniser avec le serveur.
+  Future<void> _loadPoints() async {
     final prefs = await SharedPreferences.getInstance();
     state = state.copyWith(
       totalPoints: prefs.getInt(_pointsKey) ?? 0,
-      niveau: prefs.getInt(_niveauKey) ?? 1,
+      niveau: prefs.getInt(_niveauKey) ?? 0,
       pendingSyncPoints: prefs.getInt(_pendingKey) ?? 0,
     );
+    await refresh();
   }
 
-  /// Rafraîchit l'état depuis `GET /gamification/me`.
-  /// En cas d'échec réseau, conserve le cache local sans crasher.
+  /// Recharge l'état depuis le serveur. Envoie d'abord le cumul en attente
+  /// (fusion à la reconnexion) puis adopte l'état serveur. Sans plantage
+  /// hors-ligne : en cas d'échec on conserve le cache local.
   Future<void> refresh() async {
+    if (state.isSyncing) return;
+    state = state.copyWith(isSyncing: true);
     try {
-      // Pousse d'abord les points accumulés hors-ligne, puis lit l'état serveur.
-      await _syncPending();
-      final remote = await gs.GamificationService.getMe();
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_pointsKey, remote.points);
-      await prefs.setInt(_niveauKey, remote.niveau);
-      state = state.copyWith(
-        totalPoints: remote.points,
-        niveau: remote.niveau,
-        badges: remote.badges,
-      );
+      // 1) On pousse d'abord les points accumulés hors-ligne.
+      if (state.pendingSyncPoints > 0) {
+        final synced = await GamificationService.addPoints(
+          state.pendingSyncPoints,
+          'sync_offline',
+        );
+        await _persistFromServer(synced, clearPending: true);
+        state = state.copyWith(isSyncing: false);
+        return;
+      }
+      // 2) Sinon on adopte simplement l'état serveur.
+      final me = await GamificationService.getMe();
+      await _persistFromServer(me, clearPending: true);
+      state = state.copyWith(isSyncing: false);
     } catch (_) {
-      // Hors-ligne / erreur serveur : on garde le cache déjà chargé.
+      // Hors-ligne ou erreur serveur : on garde le cache local.
+      state = state.copyWith(isSyncing: false);
     }
   }
 
-  /// Ajoute des points : met à jour le cache local immédiatement (repli),
-  /// puis tente de refléter la réponse serveur.
+  /// Ajoute des points. On met d'abord à jour le cache local (réactif,
+  /// fonctionne hors-ligne), puis on tente la synchronisation serveur.
   Future<void> addPoints(int amount, {String raison = 'quiz'}) async {
     final prefs = await SharedPreferences.getInstance();
-    // Mise à jour optimiste locale (repli hors-ligne, comportement existant).
-    final localTotal = state.totalPoints + amount;
-    await prefs.setInt(_pointsKey, localTotal);
+    final newTotal = state.totalPoints + amount;
+    final newPending = state.pendingSyncPoints + amount;
+    await prefs.setInt(_pointsKey, newTotal);
+    await prefs.setInt(_pendingKey, newPending);
     state = state.copyWith(
-      totalPoints: localTotal,
+      totalPoints: newTotal,
+      pendingSyncPoints: newPending,
       lastPointsGained: amount,
       showCelebration: true,
     );
-
-    try {
-      final remote = await gs.GamificationService.addPoints(amount, raison);
-      await prefs.setInt(_pointsKey, remote.points);
-      await prefs.setInt(_niveauKey, remote.niveau);
-      // Les points distants ont été pris en compte : rien en attente.
-      await prefs.setInt(_pendingKey, state.pendingSyncPoints);
-      state = state.copyWith(
-        totalPoints: remote.points,
-        niveau: remote.niveau,
-        badges: remote.badges,
-      );
-    } catch (_) {
-      // Échec réseau : on accumule pour synchroniser plus tard.
-      final newPending = state.pendingSyncPoints + amount;
-      await prefs.setInt(_pendingKey, newPending);
-      state = state.copyWith(pendingSyncPoints: newPending);
-    }
+    await _syncPending(raison: raison);
   }
 
   void dismissCelebration() {
     state = state.copyWith(showCelebration: false, lastPointsGained: 0);
   }
 
-  /// Envoie les points accumulés hors-ligne au backend.
-  Future<void> _syncPending() async {
+  /// Envoie le cumul en attente au serveur et adopte la réponse (points/niveau).
+  Future<void> _syncPending({String raison = 'quiz'}) async {
     if (state.pendingSyncPoints <= 0 || state.isSyncing) return;
     state = state.copyWith(isSyncing: true);
-    final amount = state.pendingSyncPoints;
     try {
-      final remote =
-          await gs.GamificationService.addPoints(amount, 'sync-offline');
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setInt(_pendingKey, 0);
-      await prefs.setInt(_pointsKey, remote.points);
-      await prefs.setInt(_niveauKey, remote.niveau);
-      state = state.copyWith(
-        pendingSyncPoints: 0,
-        isSyncing: false,
-        totalPoints: remote.points,
-        niveau: remote.niveau,
-        badges: remote.badges,
+      final me = await GamificationService.addPoints(
+        state.pendingSyncPoints,
+        raison,
       );
+      await _persistFromServer(me, clearPending: true);
+      state = state.copyWith(isSyncing: false);
     } catch (_) {
+      // On reste en cache local, le cumul sera renvoyé à la prochaine reconnexion.
       state = state.copyWith(isSyncing: false);
     }
   }
 
-  Future<void> syncNow() => _syncPending();
+  /// Persiste l'état serveur dans le cache local et reflète points/niveau.
+  Future<void> _persistFromServer(
+    GamificationMe me, {
+    bool clearPending = false,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_pointsKey, me.points);
+    await prefs.setInt(_niveauKey, me.niveau);
+    if (clearPending) await prefs.setInt(_pendingKey, 0);
+    state = state.copyWith(
+      totalPoints: me.points,
+      niveau: me.niveau,
+      pendingSyncPoints: clearPending ? 0 : state.pendingSyncPoints,
+    );
+  }
+
+  Future<void> syncNow() => refresh();
 }
 
 final gamificationProvider =
