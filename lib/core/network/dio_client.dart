@@ -124,8 +124,28 @@ class _AuthInterceptor extends Interceptor {
 
   _AuthInterceptor(this._dio, this._storage);
 
+  /// Routes d'authentification publiques : elles ne doivent JAMAIS recevoir le
+  /// token stocké (un token périmé fausserait la requête) ni déclencher la
+  /// logique de rafraîchissement sur 401 (qui masquerait le vrai message du
+  /// serveur, ex. « Code OTP invalide », derrière « Authentication required »).
+  static const List<String> _publicAuthPaths = [
+    '/auth/login',
+    '/auth/register',
+    '/auth/verify-email',
+    '/auth/resend-email-otp',
+    '/auth/forgot-password',
+    '/auth/reset-password',
+  ];
+
+  bool _isPublicAuthPath(String path) =>
+      _publicAuthPaths.any((p) => path.contains(p));
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
+    if (_isPublicAuthPath(options.path)) {
+      handler.next(options);
+      return;
+    }
     final token = await _storage.read(key: 'accessToken');
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
@@ -135,7 +155,10 @@ class _AuthInterceptor extends Interceptor {
 
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
-    if (err.response?.statusCode != 401) {
+    // On laisse passer les erreurs des routes d'auth publiques telles quelles
+    // (le vrai message du serveur doit remonter à l'écran).
+    if (err.response?.statusCode != 401 ||
+        _isPublicAuthPath(err.requestOptions.path)) {
       handler.next(err);
       return;
     }
