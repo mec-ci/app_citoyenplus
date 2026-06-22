@@ -101,7 +101,7 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
           ),
           const SizedBox(height: 8),
           Text(
-            'Saisis ton adresse email et nous t\'enverrons un lien pour réinitialiser ton mot de passe.',
+            'Saisis ton adresse email et nous t\'enverrons un code pour réinitialiser ton mot de passe.',
             style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.5),
           ),
           const SizedBox(height: 32),
@@ -207,7 +207,7 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
         ),
         const SizedBox(height: 12),
         Text(
-          'Un lien de réinitialisation a été envoyé à\n${emailCtrl.text.trim()}\n\nVérifie ta boîte mail (et tes spams).',
+          'Un code de réinitialisation a été envoyé à\n${emailCtrl.text.trim()}\n\nVérifie ta boîte mail (et tes spams).',
           style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.6),
           textAlign: TextAlign.center,
         ),
