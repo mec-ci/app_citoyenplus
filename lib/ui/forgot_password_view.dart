@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
+import 'reset_password_view.dart';
 
 const _orange = Color(0xFFE65C00);
 const _blue = Color(0xFF1556B5);
@@ -215,14 +216,19 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
           width: double.infinity,
           height: 52,
           child: ElevatedButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => ResetPasswordView(email: emailCtrl.text.trim()),
+              ),
+            ),
             style: ElevatedButton.styleFrom(
               backgroundColor: _orange,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
               elevation: 0,
             ),
             child: const Text(
-              'Retour à la connexion',
+              'J\'ai reçu le code',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
             ),
           ),
@@ -233,6 +239,14 @@ class _ForgotPasswordViewState extends State<ForgotPasswordView> {
           style: TextButton.styleFrom(foregroundColor: _blue),
           child: const Text(
             'Renvoyer l\'email',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        ),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          style: TextButton.styleFrom(foregroundColor: Colors.grey),
+          child: const Text(
+            'Retour à la connexion',
             style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
           ),
         ),

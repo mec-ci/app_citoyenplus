@@ -52,6 +52,25 @@ class DioClient {
     return await _storage.read(key: _refreshTokenKey);
   }
 
+  /// Rafraîchit les tokens via GET /auth/refresh-token en envoyant le refresh
+  /// token dans le header Authorization. Utilise une instance Dio dédiée, sans
+  /// l'intercepteur d'auth (qui écraserait le header avec l'access token et
+  /// pourrait provoquer une boucle de rafraîchissement).
+  static Future<Response?> refreshTokens(String refreshToken) {
+    final refreshDio = Dio(
+      BaseOptions(
+        baseUrl: ApiEndpoints.apiBaseUrl,
+        connectTimeout: const Duration(seconds: 10),
+        receiveTimeout: const Duration(seconds: 15),
+        headers: {'Accept': 'application/json'},
+      ),
+    );
+    return refreshDio.get(
+      ApiEndpoints.refreshToken,
+      options: Options(headers: {'Authorization': 'Bearer $refreshToken'}),
+    );
+  }
+
   static Future<void> saveTokens({
     required String accessToken,
     String? refreshToken,
@@ -129,13 +148,9 @@ class _AuthInterceptor extends Interceptor {
     }
 
     try {
-      final response = await _dio.post(
-        ApiEndpoints.refreshToken,
-        data: {'refreshToken': refreshToken},
-        options: Options(headers: {'Content-Type': 'application/json'}),
-      );
+      final response = await DioClient.refreshTokens(refreshToken);
 
-      final data = response.data as Map<String, dynamic>?;
+      final data = response?.data as Map<String, dynamic>?;
 
       final newAccessToken = data?['token'] as String?;
       if (newAccessToken == null) {
