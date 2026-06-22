@@ -49,7 +49,13 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("release")
+            // Signe avec la config release si key.properties est présent
+            // (clés de production / secrets CI), sinon repli sur la signature
+            // debug pour permettre un build (ex. CI sans keystore configuré).
+            signingConfig = if (keystorePropertiesFile.exists())
+                signingConfigs.getByName("release")
+            else
+                signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
         }
