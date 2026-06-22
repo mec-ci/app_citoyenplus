@@ -18,21 +18,11 @@ class LoginView extends StatefulWidget {
 }
 
 class LoginViewState extends State<LoginView> {
-  static const String defaultEmail = 'demo@citoyenplus.test';
-  static const String defaultPassword = 'Demotest123!';
-
   final formKey = GlobalKey<FormState>();
   final TextEditingController emailCtrl = TextEditingController();
   final TextEditingController passwordCtrl = TextEditingController();
   bool isLoading = false;
   bool hidePassword = true;
-
-  @override
-  void initState() {
-    super.initState();
-    emailCtrl.text = defaultEmail;
-    passwordCtrl.text = defaultPassword;
-  }
 
   @override
   void dispose() {
@@ -205,15 +195,6 @@ class LoginViewState extends State<LoginView> {
                     ),
                   ),
                   validator: (v) => v!.length < 6 ? 'Min. 6 caractères' : null,
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  'Compte de test prérempli :\n$defaultEmail / $defaultPassword',
-                  style: TextStyle(
-                    color: Colors.grey[600],
-                    fontSize: 12,
-                    height: 1.4,
-                  ),
                 ),
                 const SizedBox(height: 16),
 

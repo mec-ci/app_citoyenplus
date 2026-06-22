@@ -143,13 +143,19 @@ class AuthService {
     }
   }
 
-  static Future<Map<String, dynamic>> verifyRefreshToken({
-    required String refreshToken,
+  /// Vérifie l'email via le code OTP reçu après l'inscription.
+  /// En cas de succès, le backend renvoie les tokens d'authentification que
+  /// l'on persiste pour connecter directement l'utilisateur.
+  static Future<Map<String, dynamic>> verifyEmailOtp({
+    required String email,
+    required String otp,
   }) async {
     try {
-      // Le backend lit le refresh token dans le header Authorization (GET).
-      final response = await DioClient.refreshTokens(refreshToken);
-      final data = response?.data as Map<String, dynamic>? ?? {};
+      final response = await _dio.post(
+        ApiEndpoints.verifyEmail,
+        data: {'email': email, 'otp': otp},
+      );
+      final data = response.data as Map<String, dynamic>;
       if (data['token'] != null) {
         await DioClient.saveTokens(
           accessToken: data['token'],
@@ -157,6 +163,25 @@ class AuthService {
         );
       }
       return {'success': true, 'data': data};
+    } on DioException catch (e) {
+      return {'success': false, 'message': _extractMessage(e)};
+    }
+  }
+
+  /// Redemande l'envoi d'un nouveau code OTP de vérification d'email.
+  static Future<Map<String, dynamic>> resendEmailOtp({
+    required String email,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.resendEmailOtp,
+        data: {'email': email},
+      );
+      final data = response.data as Map<String, dynamic>;
+      return {
+        'success': true,
+        'message': data['message'] ?? 'Un nouveau code a été envoyé.',
+      };
     } on DioException catch (e) {
       return {'success': false, 'message': _extractMessage(e)};
     }

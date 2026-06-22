@@ -1,4 +1,4 @@
-import 'package:citoyen_plus/features/auth/refresh_token_verification_view.dart';
+import 'package:citoyen_plus/features/auth/email_verification_view.dart';
 import 'package:flutter/material.dart';
 import 'login.dart';
 import 'package:citoyen_plus/services/auth_service.dart';
@@ -49,7 +49,7 @@ class _CreateAccountViewState extends State<CreateAccountView> {
     if (result["success"]) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text("✅ Compte créé avec succès !"),
+          content: const Text("✅ Compte créé ! Vérifie ton email."),
           backgroundColor: const Color(0xFF34C759),
           behavior: SnackBarBehavior.floating,
           shape: RoundedRectangleBorder(
@@ -59,7 +59,10 @@ class _CreateAccountViewState extends State<CreateAccountView> {
       );
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (_) => const RefreshTokenVerificationView()),
+        MaterialPageRoute(
+          builder: (_) =>
+              EmailVerificationView(email: emailCtrl.text.trim()),
+        ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
