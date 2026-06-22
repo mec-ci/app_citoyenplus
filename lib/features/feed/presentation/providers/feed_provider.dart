@@ -75,6 +75,9 @@ class FeedNotifier extends StateNotifier<FeedState> {
       statut: s.statut,
       adresse: s.adresse,
       categorieNom: s.categorie?.nom,
+      likesCount: s.likesCount,
+      commentsCount: s.commentsCount,
+      likedByMe: s.likedByMe,
     );
   }
 
@@ -99,6 +102,9 @@ class FeedNotifier extends StateNotifier<FeedState> {
       createdAt: post.createdAt ?? post.date,
       auteurInitiales: 'OF',
       auteurNom: 'Officiel',
+      likesCount: post.likesCount,
+      commentsCount: post.commentsCount,
+      likedByMe: post.likedByMe,
     );
   }
 

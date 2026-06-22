@@ -15,6 +15,9 @@ class FeedItem {
   final String? slug;
   final String? categorieNom;
   final DateTime createdAt;
+  final int? likesCount;
+  final int? commentsCount;
+  final bool? likedByMe;
 
   const FeedItem({
     required this.type,
@@ -31,6 +34,9 @@ class FeedItem {
     this.slug,
     this.categorieNom,
     required this.createdAt,
+    this.likesCount,
+    this.commentsCount,
+    this.likedByMe,
   });
 
   String get duree {

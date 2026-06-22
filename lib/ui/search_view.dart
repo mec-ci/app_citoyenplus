@@ -5,6 +5,12 @@ import 'package:citoyen_plus/models/post.dart';
 import 'package:citoyen_plus/models/signalement.dart';
 import 'package:citoyen_plus/services/api_service.dart';
 import 'package:citoyen_plus/widgets/publication_card.dart';
+import 'package:citoyen_plus/widgets/commentaires_sheet.dart';
+import 'package:citoyen_plus/services/commentaire_service.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'detail_page.dart';
+import 'livre_pdf_view.dart';
+import 'quiz_view.dart';
 import 'profil_view.dart';
 
 class SearchView extends StatefulWidget {
@@ -168,7 +174,13 @@ class _SearchViewState extends State<SearchView> {
               const SizedBox(height: 8),
               ...publications.map((pub) => PublicationCard(
                     publication: pub,
-                    onComment: () {},
+                    onComment: () => showCommentairesSheet(
+                      context,
+                      cible: pub.type == 'signalement'
+                          ? CommentaireCible.signalement
+                          : CommentaireCible.actualite,
+                      id: pub.id,
+                    ),
                     onLike: () {},
                   )),
               const SizedBox(height: 16),
@@ -273,7 +285,17 @@ class _SearchViewState extends State<SearchView> {
       title: Text(post.title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(post.excerpt, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () {},
+      onTap: () {
+        final details = post.content.isNotEmpty
+            ? post.content
+            : (post.excerpt.isNotEmpty ? post.excerpt : post.title);
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DetailPage(title: post.title, details: details),
+          ),
+        );
+      },
     );
   }
 
@@ -292,7 +314,49 @@ class _SearchViewState extends State<SearchView> {
       title: Text(s.titre, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(s.adresse, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () {},
+      onTap: () {
+        final buffer = StringBuffer();
+        if (s.description.isNotEmpty) {
+          buffer.write(s.description);
+          buffer.write('\n\n');
+        }
+        buffer.write('Statut : ${s.statut}');
+        if (s.adresse.isNotEmpty) buffer.write('\nAdresse : ${s.adresse}');
+        if (s.categorie?.nom.isNotEmpty == true) {
+          buffer.write('\nCatégorie : ${s.categorie!.nom}');
+        }
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DetailPage(
+              title: s.titre,
+              details: buffer.toString(),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _openDocument(Map<String, dynamic> doc) async {
+    final rawUrl = (doc['pdf'] ?? doc['url'] ?? doc['documentUrl'] ?? '')
+        .toString();
+    if (rawUrl.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Document introuvable')),
+      );
+      return;
+    }
+    final uri = Uri.tryParse(rawUrl);
+    if (uri != null && (uri.isScheme('http') || uri.isScheme('https'))) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
+    if (!mounted) return;
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => LivrePdfView(pdf: rawUrl)),
     );
   }
 
@@ -313,12 +377,16 @@ class _SearchViewState extends State<SearchView> {
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       subtitle: Text(desc, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () {},
+      onTap: () => _openDocument(doc),
     );
   }
 
   Widget _quizTile(Map<String, dynamic> cat) {
-    final title = cat['title']?.toString() ?? cat['nom']?.toString() ?? '';
+    final title = cat['title']?.toString() ??
+        cat['titre']?.toString() ??
+        cat['nom']?.toString() ??
+        cat['name']?.toString() ??
+        '';
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 4),
       leading: Container(
@@ -332,7 +400,22 @@ class _SearchViewState extends State<SearchView> {
       ),
       title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right_rounded),
-      onTap: () {},
+      onTap: () {
+        if (title.isEmpty) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => QuizLevelView(
+              categorie: title,
+              color: const Color(0xFFE65C00),
+              icon: Icons.quiz_outlined,
+              unlockedLevel: 1,
+              completedLevels: const <int, bool>{},
+              onProgressChanged: () {},
+            ),
+          ),
+        );
+      },
     );
   }
 }
