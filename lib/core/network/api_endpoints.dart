@@ -43,6 +43,7 @@ class ApiEndpoints {
   static const String gamificationLeaderboard = '/gamification/leaderboard';
 
   static const String librairiePublic = '/librairie/public';
+  static const String librairieCategories = '/librairie/public/categories';
 
   static const String usersDetail = '/users/detail';
   // Mise à jour du profil et de l'avatar : PATCH /users (multipart, champ `image`)
