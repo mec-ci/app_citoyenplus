@@ -111,6 +111,29 @@ class CommentaireService {
     );
   }
 
+  static String _commentPath(
+    CommentaireCible cible,
+    String id,
+    String commentaireId,
+  ) {
+    switch (cible) {
+      case CommentaireCible.signalement:
+        return ApiEndpoints.signalementCommentaireById(id, commentaireId);
+      case CommentaireCible.actualite:
+        return ApiEndpoints.actualiteCommentaireById(id, commentaireId);
+    }
+  }
+
+  /// Supprime un commentaire (autorisé à son auteur ou à un administrateur
+  /// côté backend).
+  static Future<void> delete({
+    required CommentaireCible cible,
+    required String id,
+    required String commentaireId,
+  }) async {
+    await _dio.delete(_commentPath(cible, id, commentaireId));
+  }
+
   /// Publie un commentaire et renvoie le commentaire créé.
   static Future<Commentaire> add({
     required CommentaireCible cible,

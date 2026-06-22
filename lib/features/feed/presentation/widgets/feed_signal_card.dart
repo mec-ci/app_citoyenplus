@@ -18,6 +18,7 @@ class FeedSignalCard extends StatefulWidget {
 class _FeedSignalCardState extends State<FeedSignalCard> {
   late bool _liked;
   late int _likeCount;
+  late int _commentCount;
   bool _likeInFlight = false;
 
   @override
@@ -25,6 +26,7 @@ class _FeedSignalCardState extends State<FeedSignalCard> {
     super.initState();
     _liked = widget.item.likedByMe ?? false;
     _likeCount = widget.item.likesCount ?? 0;
+    _commentCount = widget.item.commentsCount ?? 0;
   }
 
   Color get _statusColor {
@@ -103,6 +105,9 @@ class _FeedSignalCardState extends State<FeedSignalCard> {
       context,
       cible: CommentaireCible.signalement,
       id: widget.item.id,
+      onCountChanged: (count) {
+        if (mounted) setState(() => _commentCount = count);
+      },
     );
   }
 
@@ -321,10 +326,10 @@ class _FeedSignalCardState extends State<FeedSignalCard> {
                               icon: Icons.mode_comment_outlined,
                               onTap: _openComments,
                             ),
-                            if ((widget.item.commentsCount ?? 0) > 0) ...[
+                            if (_commentCount > 0) ...[
                               const SizedBox(width: 2),
                               Text(
-                                '${widget.item.commentsCount}',
+                                '$_commentCount',
                                 style: const TextStyle(
                                   fontSize: 10,
                                   color: Colors.grey,
