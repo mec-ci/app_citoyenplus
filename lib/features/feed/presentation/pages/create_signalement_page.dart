@@ -12,6 +12,9 @@ import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:latlong2/latlong.dart';
 
+const _orange = Color(0xFFE65C00);
+const _stepLabels = ['Type', 'Description', 'Lieu'];
+
 class CreateSignalementPage extends ConsumerStatefulWidget {
   const CreateSignalementPage({super.key});
 
@@ -21,16 +24,22 @@ class CreateSignalementPage extends ConsumerStatefulWidget {
 }
 
 class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
-  final _formKey = GlobalKey<FormState>();
   final _titreController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _adresseController = TextEditingController();
+
+  int _step = 0;
 
   CategorieSignalementModel? _selectedCategorie;
   File? _photo;
   double? _latitude;
   double? _longitude;
   bool _isSubmitting = false;
+  bool _locating = false;
+
+  String? _titreError;
+  String? _categorieError;
+  String? _descriptionError;
   String? _locationError;
 
   @override
@@ -48,6 +57,72 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
     _adresseController.dispose();
     super.dispose();
   }
+
+  // ── Navigation entre étapes ────────────────────────────────────────────────
+
+  bool _validateStep(int step) {
+    switch (step) {
+      case 0:
+        final titre = _titreController.text.trim();
+        setState(() {
+          _categorieError =
+              _selectedCategorie == null ? 'La catégorie est requise.' : null;
+          if (titre.isEmpty) {
+            _titreError = 'Le titre est requis.';
+          } else if (titre.length < 5) {
+            _titreError = 'Au moins 5 caractères.';
+          } else {
+            _titreError = null;
+          }
+        });
+        return _categorieError == null && _titreError == null;
+      case 1:
+        final desc = _descriptionController.text.trim();
+        setState(() {
+          if (desc.isEmpty) {
+            _descriptionError = 'La description est requise.';
+          } else if (desc.length < 20) {
+            _descriptionError = 'Au moins 20 caractères.';
+          } else {
+            _descriptionError = null;
+          }
+        });
+        return _descriptionError == null;
+      case 2:
+        final adresse = _adresseController.text.trim();
+        setState(() {
+          if (_latitude == null || _longitude == null) {
+            _locationError =
+                'Indiquez la position (« Ma position » ou « Carte »).';
+          } else if (adresse.isEmpty) {
+            _locationError = 'L\'adresse est requise.';
+          } else {
+            _locationError = null;
+          }
+        });
+        return _latitude != null &&
+            _longitude != null &&
+            adresse.isNotEmpty;
+    }
+    return true;
+  }
+
+  void _next() {
+    FocusScope.of(context).unfocus();
+    if (!_validateStep(_step)) return;
+    if (_step < 2) {
+      setState(() => _step++);
+    } else {
+      _submit();
+    }
+  }
+
+  void _back() {
+    FocusScope.of(context).unfocus();
+    if (_step > 0) setState(() => _step--);
+  }
+
+  // ── Photo ──────────────────────────────────────────────────────────────────
 
   Future<void> _selectPhoto() async {
     showModalBottomSheet(
@@ -93,7 +168,7 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
     );
   }
 
-  bool _locating = false;
+  // ── Localisation ────────────────────────────────────────────────────────────
 
   /// Détecte rapidement la position GPS et remplit l'adresse via Nominatim.
   Future<void> _detectLocation() async {
@@ -167,16 +242,12 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
     });
   }
 
+  // ── Soumission ──────────────────────────────────────────────────────────────
+
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedCategorie == null) {
-      _showSnack('Selectionnez une categorie.');
-      return;
-    }
-    if (_latitude == null || _longitude == null) {
-      _showSnack(
-        'Detectez votre position ou saisissez l\'adresse manuellement.',
-      );
+    if (_selectedCategorie == null ||
+        _latitude == null ||
+        _longitude == null) {
       return;
     }
 
@@ -215,162 +286,312 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
+  // ── Build ────────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     ref.watch(signalementProvider);
-    final categorieState = ref.watch(categorieSignalementProvider);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFFE65C00),
+        backgroundColor: _orange,
         title: const Text('Signaler un probleme'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              GestureDetector(
-                onTap: _selectPhoto,
+      body: Column(
+        children: [
+          _buildProgress(),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+              child: _buildStepContent(),
+            ),
+          ),
+          _buildBottomBar(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProgress() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: List.generate(3, (i) {
+              final active = i <= _step;
+              return Expanded(
                 child: Container(
-                  height: 120,
+                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                  height: 4,
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.grey.shade300),
-                    color: Colors.grey.shade100,
+                    color: active ? _orange : Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  child: _photo == null
-                      ? Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: const [
-                            Icon(
-                              Icons.photo_outlined,
-                              size: 32,
-                              color: Colors.grey,
-                            ),
-                            SizedBox(height: 8),
-                            Text('Ajouter une photo (optionnel)'),
-                          ],
-                        )
-                      : ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.file(_photo!, fit: BoxFit.cover),
-                        ),
                 ),
-              ),
-              const SizedBox(height: 16),
-              _buildCategorieField(categorieState),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _titreController,
-                decoration: const InputDecoration(
-                  labelText: 'Titre',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'Le titre est requis.';
-                  }
-                  if (value.trim().length < 5) {
-                    return 'Au moins 5 caracteres.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _descriptionController,
-                maxLines: 4,
-                decoration: const InputDecoration(
-                  labelText: 'Description',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'La description est requise.';
-                  }
-                  if (value.trim().length < 20) {
-                    return 'Au moins 20 caracteres.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _adresseController,
-                decoration: const InputDecoration(
-                  labelText: 'Adresse',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.trim().isEmpty) {
-                    return 'L\'adresse est requise.';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 10),
-              Row(
+              );
+            }),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Étape ${_step + 1} sur 3 · ${_stepLabels[_step]}',
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.black54,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStepContent() {
+    switch (_step) {
+      case 0:
+        return _buildTypeStep();
+      case 1:
+        return _buildDescriptionStep();
+      default:
+        return _buildLocationStep();
+    }
+  }
+
+  // Étape 1 — Type : catégorie + titre.
+  Widget _buildTypeStep() {
+    final categorieState = ref.watch(categorieSignalementProvider);
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 8),
+          _buildCategorieField(categorieState),
+          if (_categorieError != null) ...[
+            const SizedBox(height: 6),
+            Text(_categorieError!,
+                style: const TextStyle(color: Colors.red, fontSize: 12)),
+          ],
+          const SizedBox(height: 18),
+          TextField(
+            controller: _titreController,
+            onChanged: (_) {
+              if (_titreError != null) setState(() => _titreError = null);
+            },
+            decoration: InputDecoration(
+              labelText: 'Titre',
+              hintText: 'Ex. Nid de poule dangereux',
+              border: const OutlineInputBorder(),
+              errorText: _titreError,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Étape 2 — Description « façon Facebook » : grand composeur plein écran.
+  Widget _buildDescriptionStep() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            const CircleAvatar(
+              radius: 20,
+              backgroundColor: Color(0xFFE6F1FB),
+              child: Icon(Icons.person, color: Color(0xFF185FA5)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _locating ? null : _detectLocation,
-                      icon: _locating
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.my_location, size: 18),
-                      label: const Text('Ma position'),
-                    ),
+                  Text(
+                    _selectedCategorie?.nom ?? 'Signalement',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: _pickOnMap,
-                      icon: const Icon(Icons.map_outlined, size: 18),
-                      label: const Text('Carte'),
-                    ),
+                  const Text(
+                    'Décris ce que tu signales',
+                    style: TextStyle(fontSize: 12, color: Colors.black54),
                   ),
                 ],
               ),
-              if (_latitude != null && _longitude != null) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(Icons.check_circle,
-                        color: Color(0xFF34C759), size: 16),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Position définie : '
-                        '${_latitude!.toStringAsFixed(5)}, '
-                        '${_longitude!.toStringAsFixed(5)}',
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.black54),
-                      ),
-                    ),
-                  ],
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Expanded(
+          child: TextField(
+            controller: _descriptionController,
+            autofocus: true,
+            maxLines: null,
+            expands: true,
+            textAlignVertical: TextAlignVertical.top,
+            keyboardType: TextInputType.multiline,
+            onChanged: (_) {
+              if (_descriptionError != null) {
+                setState(() => _descriptionError = null);
+              }
+            },
+            style: const TextStyle(fontSize: 18, height: 1.4),
+            decoration: const InputDecoration(
+              border: InputBorder.none,
+              hintText: 'Que veux-tu signaler ? Donne un maximum de détails…',
+              hintStyle: TextStyle(fontSize: 18, color: Colors.grey),
+            ),
+          ),
+        ),
+        if (_descriptionError != null)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              _descriptionError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ),
+        const Divider(height: 1),
+        _buildPhotoComposer(),
+      ],
+    );
+  }
+
+  Widget _buildPhotoComposer() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (_photo != null) ...[
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.file(
+                _photo!,
+                height: 160,
+                width: double.infinity,
+                fit: BoxFit.cover,
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => setState(() => _photo = null),
+                icon: const Icon(Icons.delete_outline, size: 18),
+                label: const Text('Retirer la photo'),
+              ),
+            ),
+          ] else
+            OutlinedButton.icon(
+              onPressed: _selectPhoto,
+              icon: const Icon(Icons.add_photo_alternate_outlined, size: 20),
+              label: const Text('Ajouter une photo (optionnel)'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // Étape 3 — Lieu : adresse + position (GPS / carte).
+  Widget _buildLocationStep() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const SizedBox(height: 8),
+          TextField(
+            controller: _adresseController,
+            decoration: const InputDecoration(
+              labelText: 'Adresse',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _locating ? null : _detectLocation,
+                  icon: _locating
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.my_location, size: 18),
+                  label: const Text('Ma position'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _pickOnMap,
+                  icon: const Icon(Icons.map_outlined, size: 18),
+                  label: const Text('Carte'),
+                ),
+              ),
+            ],
+          ),
+          if (_latitude != null && _longitude != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.check_circle,
+                    color: Color(0xFF34C759), size: 16),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Position définie : '
+                    '${_latitude!.toStringAsFixed(5)}, '
+                    '${_longitude!.toStringAsFixed(5)}',
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
                 ),
               ],
-              if (_locationError != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  _locationError!,
-                  style: const TextStyle(color: Colors.red),
+            ),
+          ],
+          if (_locationError != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              _locationError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBottomBar() {
+    final isLast = _step == 2;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            if (_step > 0) ...[
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: _isSubmitting ? null : _back,
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
+                  child: const Text('Retour'),
                 ),
-              ],
-              const SizedBox(height: 24),
-              ElevatedButton(
+              ),
+              const SizedBox(width: 12),
+            ],
+            Expanded(
+              child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE65C00),
+                  backgroundColor: _orange,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-                onPressed: _isSubmitting ? null : _submit,
-                child: _isSubmitting
+                onPressed: _isSubmitting ? null : _next,
+                child: (_isSubmitting && isLast)
                     ? const SizedBox(
                         height: 20,
                         width: 20,
@@ -379,10 +600,10 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
                           strokeWidth: 2,
                         ),
                       )
-                    : const Text('Soumettre le signalement'),
+                    : Text(isLast ? 'Publier le signalement' : 'Suivant'),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
@@ -395,7 +616,7 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
           labelText: 'Categorie',
           border: OutlineInputBorder(),
         ),
-        items: <DropdownMenuItem<String>>[],
+        items: const <DropdownMenuItem<String>>[],
         onChanged: null,
       );
     }
@@ -410,13 +631,14 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
               border: OutlineInputBorder(),
               errorText: 'Erreur de chargement',
             ),
-            items: <DropdownMenuItem<String>>[],
+            items: const <DropdownMenuItem<String>>[],
             onChanged: null,
           ),
           const SizedBox(height: 4),
           TextButton.icon(
-            onPressed: () =>
-                ref.read(categorieSignalementProvider.notifier).fetchCategories(),
+            onPressed: () => ref
+                .read(categorieSignalementProvider.notifier)
+                .fetchCategories(),
             icon: const Icon(Icons.refresh, size: 16),
             label: const Text('Reessayer'),
           ),
@@ -431,7 +653,7 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
           border: OutlineInputBorder(),
           hintText: 'Aucune categorie disponible',
         ),
-        items: <DropdownMenuItem<String>>[],
+        items: const <DropdownMenuItem<String>>[],
         onChanged: null,
       );
     }
@@ -454,10 +676,9 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
         setState(() {
           _selectedCategorie =
               state.categories.firstWhere((c) => c.id == value);
+          _categorieError = null;
         });
       },
-      validator: (value) =>
-          value == null ? 'La categorie est requise.' : null,
     );
   }
 }
