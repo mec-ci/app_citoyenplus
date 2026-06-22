@@ -52,9 +52,9 @@ class QuizCategoriesNotifier extends StateNotifier<QuizCategoriesState> {
 }
 
 List<Map<String, dynamic>> get _mockFallbackCategories => [
-  {'id': 'fallback_1', 'titre': 'Constitution', 'totalXp': 100},
-  {'id': 'fallback_2', 'titre': 'Institutions', 'totalXp': 80},
-  {'id': 'fallback_3', 'titre': 'Histoire', 'totalXp': 100},
+  {'id': 'fallback_1', 'nom': 'Constitution', '_count': {'quizzes': 0}},
+  {'id': 'fallback_2', 'nom': 'Institutions', '_count': {'quizzes': 0}},
+  {'id': 'fallback_3', 'nom': 'Histoire', '_count': {'quizzes': 0}},
 ];
 
 final quizCategoriesProvider = StateNotifierProvider<QuizCategoriesNotifier, QuizCategoriesState>((ref) {
@@ -62,7 +62,7 @@ final quizCategoriesProvider = StateNotifierProvider<QuizCategoriesNotifier, Qui
 });
 
 class QuizListState {
-  final List<QuizModel> quizzes;
+  final List<ApiQuiz> quizzes;
   final bool isLoading;
   final String? error;
 
@@ -73,7 +73,7 @@ class QuizListState {
   });
 
   QuizListState copyWith({
-    List<QuizModel>? quizzes,
+    List<ApiQuiz>? quizzes,
     bool? isLoading,
     String? error,
   }) {
@@ -91,8 +91,7 @@ class QuizListNotifier extends StateNotifier<QuizListState> {
   Future<void> fetchQuizzes() async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final raw = await ApiService.fetchQuizzes();
-      final quizzes = raw.map((e) => QuizModel.fromJson(e)).toList();
+      final quizzes = await ApiService.fetchQuizzes();
       state = QuizListState(quizzes: quizzes, isLoading: false);
     } on DioException {
       state = QuizListState(quizzes: [], isLoading: false);
@@ -111,7 +110,7 @@ final quizListProvider = StateNotifierProvider<QuizListNotifier, QuizListState>(
 });
 
 class QuizDetailState {
-  final QuizModel? quiz;
+  final ApiQuiz? quiz;
   final bool isLoading;
   final String? error;
 
@@ -122,7 +121,7 @@ class QuizDetailState {
   });
 
   QuizDetailState copyWith({
-    QuizModel? quiz,
+    ApiQuiz? quiz,
     bool? isLoading,
     String? error,
   }) {
@@ -144,7 +143,7 @@ class QuizDetailNotifier extends StateNotifier<QuizDetailState> {
       final data = response.data is Map<String, dynamic>
           ? response.data['data'] ?? response.data
           : response.data;
-      final quiz = QuizModel.fromJson(data as Map<String, dynamic>);
+      final quiz = ApiQuiz.fromJson((data as Map).cast<String, dynamic>());
       state = QuizDetailState(quiz: quiz, isLoading: false);
     } catch (e) {
       state = QuizDetailState(

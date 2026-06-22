@@ -16,6 +16,14 @@ const _red = Color(0xFFFF2D55);
 class Quizquestions extends ConsumerStatefulWidget {
   final String categorie;
   final int level;
+
+  /// Identifiant RÉEL du quiz côté API (UUID). `null` en mode hors-ligne
+  /// (banque locale) : la soumission serveur est alors impossible et le
+  /// résultat n'est pas envoyé.
+  final String? quizId;
+
+  /// Questions au format map. Chaque entrée peut porter les vrais identifiants
+  /// (`questionId`, `choiceIds`) lorsque les questions viennent de l'API.
   final List<Map<String, dynamic>> questions;
   final Future<void> Function(bool passed)? onLevelCompleted;
 
@@ -23,6 +31,7 @@ class Quizquestions extends ConsumerStatefulWidget {
     super.key,
     required this.categorie,
     required this.level,
+    this.quizId,
     required this.questions,
     this.onLevelCompleted,
   });
@@ -86,8 +95,11 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
       selectedAnswer = -1;
     });
     _timePerQuestion.add(_maxSeconds.toDouble());
+    final q = widget.questions[questionIndex];
     _answers.add({
       'questionId': questionIndex,
+      'questionRealId': q['questionId'],
+      'choiceRealId': null, // aucune réponse (temps écoulé)
       'selectedChoice': -1,
       'isCorrect': false,
       'timeSpent': _maxSeconds,
@@ -116,8 +128,17 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
       _currentScore += pointsGained;
     });
 
+    final q = widget.questions[questionIndex];
+    final choiceIds = q['choiceIds'];
+    final String? choiceRealId =
+        (choiceIds is List && index >= 0 && index < choiceIds.length)
+            ? choiceIds[index]?.toString()
+            : null;
+
     _answers.add({
       'questionId': questionIndex,
+      'questionRealId': q['questionId'],
+      'choiceRealId': choiceRealId,
       'selectedChoice': index,
       'isCorrect': isCorrect,
       'timeSpent': timeSpent,
@@ -173,21 +194,33 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
     );
   }
 
-  /// Soumet le résultat au backend `POST /quizz/submit` avec le userId de
-  /// l'utilisateur connecté. En cas d'échec (hors-ligne / erreur), on met le
-  /// résultat en file d'attente locale pour un envoi ultérieur.
+  /// Soumet le résultat au backend `POST /quizz/submit` avec :
+  /// - le VRAI `quizId` (UUID renvoyé par l'API),
+  /// - le `userId` de l'utilisateur connecté,
+  /// - `answers` = `[{ questionId: <vrai id>, choiceId: <vrai id du choix> }]`.
   ///
-  /// NB : les questions proviennent de la banque locale (indices entiers).
-  /// On mappe donc `questionId`/`choiceId` sur les indices (en chaîne) et on
-  /// construit un `quizId` stable à partir de la catégorie et du niveau.
+  /// En cas d'échec (hors-ligne / erreur réseau), le résultat est mis en file
+  /// d'attente locale (`pending_quiz_results`) pour un renvoi ultérieur.
   Future<void> _submitQuizResult() async {
-    final quizId = 'quiz:${widget.categorie}:niveau${widget.level}';
-    final payloadAnswers = _answers
-        .map((a) => {
-              'questionId': a['questionId'].toString(),
-              'choiceId': (a['selectedChoice'] as int).toString(),
-            })
-        .toList();
+    final quizId = widget.quizId;
+
+    // Construit la soumission à partir des VRAIS identifiants des questions et
+    // des choix. On ignore les réponses sans choix sélectionné (temps écoulé)
+    // ou dépourvues d'identifiants (questions hors banque API).
+    final payloadAnswers = <Map<String, dynamic>>[];
+    for (final a in _answers) {
+      final questionRealId = a['questionRealId'];
+      final choiceRealId = a['choiceRealId'];
+      if (questionRealId == null || choiceRealId == null) continue;
+      payloadAnswers.add({
+        'questionId': questionRealId.toString(),
+        'choiceId': choiceRealId.toString(),
+      });
+    }
+
+    // Pas de quizId réel (mode hors-ligne / banque locale) ou aucune réponse
+    // exploitable : impossible de soumettre au serveur.
+    if (quizId == null || quizId.isEmpty || payloadAnswers.isEmpty) return;
 
     final userId = await UserService.currentUserId();
     if (userId == null) {
@@ -196,12 +229,12 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
     }
 
     try {
-      final ok = await ApiService.postQuizResult(
+      final result = await ApiService.postQuizResult(
         userId: userId,
         quizId: quizId,
         answers: payloadAnswers,
       );
-      if (!ok) {
+      if (result == null) {
         await _cachePendingResult(quizId, payloadAnswers, userId: userId);
       }
     } catch (_) {
@@ -230,7 +263,8 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
   @override
   Widget build(BuildContext context) {
     final question = widget.questions[questionIndex];
-    final int correct = question['correct'];
+    final int correct = (question['correct'] as int?) ?? -1;
+    final List options = (question['options'] as List?) ?? const [];
     final int total = widget.questions.length;
     final double progress = (questionIndex + 1) / total;
     final double timerValue = _secondsRemaining / _maxSeconds;
@@ -388,7 +422,7 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
             Expanded(
               child: ListView.builder(
                 physics: const NeverScrollableScrollPhysics(),
-                itemCount: 4,
+                itemCount: options.length,
                 itemBuilder: (context, i) {
                   final bool isSelected = selectedAnswer == i;
                   final bool isCorrectAnswer = i == correct;
@@ -452,7 +486,7 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
                             ),
                             child: Center(
                               child: Text(
-                                ['A', 'B', 'C', 'D'][i],
+                                String.fromCharCode(65 + i),
                                 style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w800,
@@ -463,7 +497,7 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
                           const SizedBox(width: 12),
                           Expanded(
                             child: Text(
-                              question['options'][i],
+                              options[i].toString(),
                               style: TextStyle(
                                   fontSize: 14,
                                   color: textColor,

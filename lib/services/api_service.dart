@@ -4,6 +4,7 @@ import '../core/network/dio_client.dart';
 import '../core/network/api_endpoints.dart';
 import '../models/post.dart';
 import '../models/signalement.dart';
+import '../models/quiz.dart';
 
 class ApiService {
   static final Dio _dio = DioClient.getInstance();
@@ -26,7 +27,11 @@ class ApiService {
   /// Forme attendue par le backend (aucune modification serveur) :
   /// `{ userId, quizId, answers: [{ questionId, choiceId }] }`.
   /// Le `userId` provient de l'utilisateur connecté (côté mobile).
-  static Future<bool> postQuizResult({
+  /// Renvoie la réponse serveur (`{ userQuiz, score, correctCount,
+  /// totalQuestions, percentage }`) en cas de succès, ou `null` si l'appel
+  /// n'aboutit pas (le statut HTTP n'est pas 200/201). Les erreurs réseau
+  /// (DioException) sont propagées à l'appelant pour le repli hors-ligne.
+  static Future<Map<String, dynamic>?> postQuizResult({
     required String userId,
     required String quizId,
     required List<Map<String, dynamic>> answers,
@@ -36,7 +41,17 @@ class ApiService {
       'quizId': quizId,
       'answers': answers,
     });
-    return response.statusCode == 200 || response.statusCode == 201;
+    if (response.statusCode == 200 || response.statusCode == 201) {
+      final data = response.data;
+      if (data is Map<String, dynamic>) {
+        // Certaines réponses sont enveloppées dans une clé `data`.
+        final inner = data['data'];
+        if (inner is Map<String, dynamic>) return inner;
+        return data;
+      }
+      return <String, dynamic>{};
+    }
+    return null;
   }
 
   /// Récupère les résultats de quiz d'un utilisateur (`GET /quizz/results/:userId`).
@@ -98,225 +113,51 @@ class ApiService {
   }
 
   /// Charge les catégories de quiz depuis l'API (`GET /quizz/categories`).
-  /// En cas d'indisponibilité réseau (hors-ligne), repli EXPLICITE sur les
-  /// données mock locales pour ne pas bloquer l'utilisateur.
+  /// Forme réelle : `[{ id, nom, _count: { quizzes } }]`. Les erreurs réseau
+  /// sont propagées à l'appelant (qui gère le repli/`catchError`).
   static Future<List<Map<String, dynamic>>> fetchQuizCategories() async {
-    try {
-      final response = await _dio.get(ApiEndpoints.quizzCategories);
-      final data = response.data;
-      final categories = data is Map<String, dynamic> ? data['data'] ?? data : data;
-      return (categories as List)
-          .map((item) => item as Map<String, dynamic>)
-          .toList();
-    } on DioException {
-      // Fallback offline explicite : données mock locales.
-      return _mockQuizCategories;
-    }
+    final response = await _dio.get(ApiEndpoints.quizzCategories);
+    final data = response.data;
+    final categories =
+        data is Map<String, dynamic> ? data['data'] ?? data : data;
+    return (categories as List)
+        .map((item) => (item as Map).cast<String, dynamic>())
+        .toList();
   }
 
-  /// Charge les quiz depuis l'API (`GET /quizz`).
-  /// Repli EXPLICITE sur le mock local en cas d'erreur réseau (offline).
-  static Future<List<Map<String, dynamic>>> fetchQuizzes() async {
-    try {
-      final response = await _dio.get(ApiEndpoints.quizz);
+  /// Charge tous les quiz depuis l'API (`GET /quizz?page=…&limit=…`) et les
+  /// parse en modèles [ApiQuiz] (avec de VRAIS identifiants : quiz, questions,
+  /// choix). Pagine jusqu'à récupérer l'ensemble des quiz (`meta.totalPages`).
+  ///
+  /// Aucun repli mock ici : une erreur réseau (DioException) est PROPAGÉE à
+  /// l'appelant, qui décide du repli hors-ligne (banque de questions locale).
+  static Future<List<ApiQuiz>> fetchQuizzes({int limit = 50}) async {
+    final List<ApiQuiz> all = [];
+    int page = 1;
+    int totalPages = 1;
+    do {
+      final response = await _dio.get(
+        ApiEndpoints.quizz,
+        queryParameters: {'page': page, 'limit': limit},
+      );
       final data = response.data;
-      final quizzes = data is Map<String, dynamic> ? data['data'] ?? data : data;
-      return (quizzes as List)
-          .map((item) => item as Map<String, dynamic>)
-          .toList();
-    } on DioException {
-      // Fallback offline explicite : données mock locales.
-      return _mockQuizzes;
-    }
+      final List items;
+      if (data is Map<String, dynamic>) {
+        items = (data['data'] ?? data['items'] ?? const []) as List;
+        final meta = data['meta'];
+        if (meta is Map && meta['totalPages'] != null) {
+          totalPages = int.tryParse(meta['totalPages'].toString()) ?? 1;
+        }
+      } else {
+        items = data as List;
+      }
+      all.addAll(
+        items.map((e) => ApiQuiz.fromJson((e as Map).cast<String, dynamic>())),
+      );
+      page++;
+    } while (page <= totalPages);
+    return all;
   }
-
-  // ── MOCK DATA ──────────────────────────────────────────────────────────────
-
-  static List<Map<String, dynamic>> get _mockQuizCategories => [
-    {
-      'id': 'mock_cat_1',
-      'titre': 'Constitution',
-      'description': 'Testez vos connaissances sur la Constitution ivoirienne',
-      'totalXp': 100,
-    },
-    {
-      'id': 'mock_cat_2',
-      'titre': 'Institutions',
-      'description': 'Les institutions de la République de Côte d\'Ivoire',
-      'totalXp': 80,
-    },
-    {
-      'id': 'mock_cat_3',
-      'titre': 'Histoire',
-      'description': 'L\'histoire de la Côte d\'Ivoire',
-      'totalXp': 100,
-    },
-  ];
-
-  static List<Map<String, dynamic>> get _mockQuizzes => [
-    {
-      'id': 'mock_quiz_1',
-      'title': 'Quiz Constitution',
-      'description': 'Testez vos connaissances sur la Constitution',
-      'difficulte': 'FACILE',
-      'categorieId': 'mock_cat_1',
-      'questions': [
-        {
-          'text': 'En quelle année la Constitution ivoirienne actuelle a-t-elle été adoptée ?',
-          'choices': [
-            {'text': '2000', 'isCorrect': false},
-            {'text': '2016', 'isCorrect': true},
-            {'text': '2010', 'isCorrect': false},
-            {'text': '1999', 'isCorrect': false},
-          ],
-        },
-        {
-          'text': 'Quel est le rôle du Conseil Constitutionnel ?',
-          'choices': [
-            {'text': 'Organiser les élections', 'isCorrect': false},
-            {'text': 'Veiller au respect de la Constitution', 'isCorrect': true},
-            {'text': 'Juger les criminels', 'isCorrect': false},
-            {'text': 'Préparer les lois', 'isCorrect': false},
-          ],
-        },
-        {
-          'text': 'Combien de titres comporte la Constitution de 2016 ?',
-          'choices': [
-            {'text': '12', 'isCorrect': false},
-            {'text': '14', 'isCorrect': true},
-            {'text': '10', 'isCorrect': false},
-            {'text': '16', 'isCorrect': false},
-          ],
-        },
-        {
-          'text': 'Qui est le garant de l\'indépendance de la justice ?',
-          'choices': [
-            {'text': 'Le Premier ministre', 'isCorrect': false},
-            {'text': 'Le Président de la République', 'isCorrect': true},
-            {'text': 'Le Conseil supérieur de la magistrature', 'isCorrect': false},
-            {'text': 'Le Garde des Sceaux', 'isCorrect': false},
-          ],
-        },
-        {
-          'text': 'La Constitution ivoirienne consacre le principe de :',
-          'choices': [
-            {'text': 'La monarchie', 'isCorrect': false},
-            {'text': 'La dictature', 'isCorrect': false},
-            {'text': 'La séparation des pouvoirs', 'isCorrect': true},
-            {'text': 'Le pouvoir absolu', 'isCorrect': false},
-          ],
-        },
-      ],
-    },
-    {
-      'id': 'mock_quiz_2',
-      'title': 'Quiz Institutions',
-      'description': 'Connaissez-vous les institutions ivoiriennes ?',
-      'difficulte': 'MOYEN',
-      'categorieId': 'mock_cat_2',
-      'questions': [
-        {
-          'text': 'Quel est le rôle de l\'Assemblée Nationale ?',
-          'choices': [
-            {'text': 'Faire les lois', 'isCorrect': true},
-            {'text': 'Juger les citoyens', 'isCorrect': false},
-            {'text': 'Organiser les élections', 'isCorrect': false},
-            {'text': 'Défendre le pays', 'isCorrect': false},
-          ],
-        },
-        {
-          'text': 'Qui nomme le Premier ministre en Côte d\'Ivoire ?',
-          'choices': [
-            {'text': 'Le Sénat', 'isCorrect': false},
-            {'text': 'Le Président de la République', 'isCorrect': true},
-            {'text': 'L\'Assemblée Nationale', 'isCorrect': false},
-            {'text': 'Le peuple', 'isCorrect': false},
-          ],
-        },
-        {
-          'text': 'Combien y a-t-il de pouvoirs dans l\'État ivoirien ?',
-          'choices': [
-            {'text': '2', 'isCorrect': false},
-            {'text': '3', 'isCorrect': true},
-            {'text': '4', 'isCorrect': false},
-            {'text': '5', 'isCorrect': false},
-          ],
-        },
-        {
-          'text': 'Quel est le mandat du Président de la République ?',
-          'choices': [
-            {'text': '4 ans', 'isCorrect': false},
-            {'text': '5 ans', 'isCorrect': true},
-            {'text': '6 ans', 'isCorrect': false},
-            {'text': '7 ans', 'isCorrect': false},
-          ],
-        },
-        {
-          'text': 'Quelle institution contrôle les finances publiques ?',
-          'choices': [
-            {'text': 'La Cour suprême', 'isCorrect': false},
-            {'text': 'La Cour des comptes', 'isCorrect': true},
-            {'text': 'Le Sénat', 'isCorrect': false},
-            {'text': 'La BCEAO', 'isCorrect': false},
-          ],
-        },
-      ],
-    },
-    {
-      'id': 'mock_quiz_3',
-      'title': 'Quiz Histoire',
-      'description': 'Testez votre connaissance de l\'histoire ivoirienne',
-      'difficulte': 'FACILE',
-      'categorieId': 'mock_cat_3',
-      'questions': [
-        {
-          'text': 'En quelle année la Côte d\'Ivoire a-t-elle obtenu son indépendance ?',
-          'choices': [
-            {'text': '1958', 'isCorrect': false},
-            {'text': '1960', 'isCorrect': true},
-            {'text': '1962', 'isCorrect': false},
-            {'text': '1970', 'isCorrect': false},
-          ],
-        },
-        {
-          'text': 'Qui fut le premier président de la Côte d\'Ivoire ?',
-          'choices': [
-            {'text': 'Alassane Ouattara', 'isCorrect': false},
-            {'text': 'Laurent Gbagbo', 'isCorrect': false},
-            {'text': 'Félix Houphouët-Boigny', 'isCorrect': true},
-            {'text': 'Henri Konan Bédié', 'isCorrect': false},
-          ],
-        },
-        {
-          'text': 'Quelle est la devise nationale de la Côte d\'Ivoire ?',
-          'choices': [
-            {'text': 'Travail – Famille – Patrie', 'isCorrect': false},
-            {'text': 'Union – Discipline – Travail', 'isCorrect': false},
-            {'text': 'Paix – Unité – Progrès', 'isCorrect': true},
-            {'text': 'Liberté – Égalité – Fraternité', 'isCorrect': false},
-          ],
-        },
-        {
-          'text': 'Quel événement majeur a eu lieu en Côte d\'Ivoire en 1999 ?',
-          'choices': [
-            {'text': 'L\'indépendance', 'isCorrect': false},
-            {'text': 'Le premier coup d\'État', 'isCorrect': true},
-            {'text': 'L\'élection présidentielle', 'isCorrect': false},
-            {'text': 'La CAN', 'isCorrect': false},
-          ],
-        },
-        {
-          'text': 'Quel surnom donne-t-on à Abidjan ?',
-          'choices': [
-            {'text': 'La ville lumière', 'isCorrect': false},
-            {'text': 'La perle des lagunes', 'isCorrect': true},
-            {'text': 'La capitale culturelle', 'isCorrect': false},
-            {'text': 'La cité du cacao', 'isCorrect': false},
-          ],
-        },
-      ],
-    },
-  ];
 
   static Future<List<Map<String, dynamic>>> fetchNotifications() async {
     final response = await _dio.get('/notifications');
