@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../config/api_config.dart';
 import '../core/network/dio_client.dart';
 import '../core/network/api_endpoints.dart';
 
@@ -11,10 +12,18 @@ class CommentaireAuteur {
   const CommentaireAuteur({required this.id, required this.nom, this.avatar});
 
   factory CommentaireAuteur.fromJson(Map<String, dynamic> json) {
+    // Le backend renvoie un chemin relatif (ex. `/uploads/users-avatar/...`).
+    // On le préfixe par l'hôte pour obtenir une URL absolue chargeable.
+    final rawAvatar = json['avatar']?.toString();
+    final avatar = (rawAvatar != null && rawAvatar.isNotEmpty)
+        ? (rawAvatar.startsWith('http')
+            ? rawAvatar
+            : '${ApiConfig.host}${rawAvatar.startsWith('/') ? '' : '/'}$rawAvatar')
+        : null;
     return CommentaireAuteur(
       id: (json['id'] ?? '').toString(),
       nom: json['nom']?.toString() ?? json['name']?.toString() ?? 'Utilisateur',
-      avatar: json['avatar']?.toString(),
+      avatar: avatar,
     );
   }
 }
