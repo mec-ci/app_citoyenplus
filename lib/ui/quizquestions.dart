@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../providers/gamification_provider.dart';
+import '../features/auth/presentation/providers/auth_provider.dart';
+import '../services/api_service.dart';
+import '../services/user_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'quiz_score_screen.dart';
 
@@ -144,7 +147,17 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
     final totalPoints = _currentScore;
     final passed = pct >= 60;
 
-    ref.read(gamificationProvider.notifier).addPoints(totalPoints);
+    // Gain de points via la gamification (synchronisé au backend en LOT A).
+    if (totalPoints > 0) {
+      ref.read(gamificationProvider.notifier).addPoints(
+            totalPoints,
+            raison: 'quiz:${widget.categorie}:niveau${widget.level}',
+          );
+    }
+
+    // Persistance du résultat côté serveur (POST /quizz/submit) avec l'userId
+    // de l'utilisateur connecté. Best-effort : ne bloque pas l'affichage.
+    _submitResult(total);
 
     Navigator.pushReplacement(
       context,
@@ -162,6 +175,33 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
         ),
       ),
     );
+  }
+
+  /// Récupère l'userId (auth provider en priorité, sinon profil serveur) et
+  /// envoie le résultat du quiz au backend. Best-effort : les erreurs réseau
+  /// sont silencieuses, le cache local de progression reste le repli.
+  Future<void> _submitResult(int total) async {
+    String? userId = _userIdFromAuth();
+    userId ??= await UserService.currentUserId();
+    if (userId == null || userId.isEmpty) return;
+
+    await ApiService.postQuizResult(
+      userId: userId,
+      quizId: '${widget.categorie}-niveau${widget.level}',
+      score: correctCount,
+      total: total,
+      answers: _answers,
+      timePerQuestion: _timePerQuestion,
+    );
+  }
+
+  String? _userIdFromAuth() {
+    final data = ref.read(authProvider).userData;
+    if (data == null) return null;
+    final user = data['user'] is Map ? data['user'] as Map : data;
+    final id = user['id'] ?? user['_id'] ?? user['userId'];
+    final str = id?.toString();
+    return (str != null && str.isNotEmpty) ? str : null;
   }
 
   @override
