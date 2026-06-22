@@ -233,7 +233,11 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
   }
 
   Widget _buildProgressionBar() {
-    final progress = signalementCount.clamp(0, 10) / 10.0;
+    final gami = ref.watch(gamificationProvider);
+    final niveau = gami.niveau;
+    // Progression vers le niveau suivant : 100 points par niveau (indicatif).
+    final pointsDansNiveau = gami.totalPoints % 100;
+    final progress = (pointsDansNiveau / 100.0).clamp(0.0, 1.0);
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -253,9 +257,9 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Progression citoyenne',
-                style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+              Text(
+                'Progression citoyenne · Niveau $niveau',
+                style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               ),
               Text(
                 '${(progress * 100).toInt()}%',
@@ -279,7 +283,7 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
           ),
           const SizedBox(height: 6),
           Text(
-            'Signalez des problemes et participez a des actions pour monter de niveau',
+            '$pointsDansNiveau/100 pts vers le niveau ${niveau + 1} · participez et jouez aux quiz pour progresser',
             style: TextStyle(fontSize: 10, color: Colors.grey[400]),
           ),
         ],

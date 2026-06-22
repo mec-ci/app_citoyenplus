@@ -33,6 +33,12 @@ class ApiEndpoints {
   static const String quizzCategories = '/quizz/categories';
   static const String quizzSubmit = '/quizz/submit';
   static const String quizzResults = '/quizz/results';
+  static String quizzResultsByUser(String userId) => '/quizz/results/$userId';
+
+  // ── Gamification ─────────────────────────────────────────────────────────────
+  static const String gamificationMe = '/gamification/me';
+  static const String gamificationPoints = '/gamification/points';
+  static const String gamificationLeaderboard = '/gamification/leaderboard';
 
   static const String librairiePublic = '/librairie/public';
 
