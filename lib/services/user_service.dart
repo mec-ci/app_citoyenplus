@@ -31,12 +31,13 @@ class UserService {
   }
 
   static Future<Map<String, dynamic>> fetchProfileById(String userId) async {
-    final response = await _dio.get('/users/$userId');
+    final response = await _dio.get('/users/$userId/profile');
     return response.data as Map<String, dynamic>;
   }
 
+  /// Récupère les actualités présentes en base (liste paginée publique).
   static Future<List<PostModel>> fetchUserActualites(String userId) async {
-    final response = await _dio.get('${ApiEndpoints.actualites}/$userId');
+    final response = await _dio.get(ApiEndpoints.actualites);
     final data = response.data;
     final items = data is Map<String, dynamic> ? data['data'] ?? data : data;
     return (items as List)
@@ -56,61 +57,57 @@ class UserService {
         .toList();
   }
 
+  /// Met à jour le profil de l'utilisateur authentifié via PATCH /users
+  /// (multipart/form-data). Le backend ne gère que fullname / email / phone.
   static Future<bool> updateProfile({
     required String name,
     String? email,
     String? phone,
-    String? bio,
-    String? avatarUrl,
   }) async {
-    final body = <String, dynamic>{'fullname': name};
-    if (email != null) body['email'] = email;
-    if (phone != null) body['phone'] = phone;
-    if (bio != null) body['bio'] = bio;
-    if (avatarUrl != null) body['avatarUrl'] = avatarUrl;
+    final fields = <String, dynamic>{'fullname': name};
+    if (email != null) fields['email'] = email;
+    if (phone != null) fields['phone'] = phone;
 
-    final response = await _dio.patch(ApiEndpoints.usersDetail, data: body);
+    final response = await _dio.patch(
+      ApiEndpoints.usersUpdate,
+      data: FormData.fromMap(fields),
+      options: Options(contentType: 'multipart/form-data'),
+    );
     return response.statusCode == 200 || response.statusCode == 201;
   }
 
+  /// Téléverse l'avatar via PATCH /users (champ `image`). Renvoie l'URL/chemin
+  /// de l'avatar retourné par le backend (champ `avatar`).
   static Future<String?> uploadAvatar(XFile photo) async {
     final formData = FormData.fromMap({
-      'avatar': await MultipartFile.fromFile(
+      'image': await MultipartFile.fromFile(
         photo.path,
         filename: photo.name,
       ),
     });
 
-    final response = await _dio.post(
-      ApiEndpoints.usersAvatar,
+    final response = await _dio.patch(
+      ApiEndpoints.usersUpdate,
       data: formData,
       options: Options(contentType: 'multipart/form-data'),
     );
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       final data = response.data as Map<String, dynamic>;
-      return data['avatarUrl'] as String?;
+      return (data['avatar'] ?? data['avatarUrl']) as String?;
     }
     return null;
   }
 
+  /// Change le mot de passe via PATCH /users/password.
+  /// Le backend attend `password` et `confirmPassword`.
   static Future<bool> changePassword({
-    required String oldPassword,
     required String newPassword,
   }) async {
-    final response = await _dio.put(ApiEndpoints.changePassword, data: {
-      'oldPassword': oldPassword,
-      'newPassword': newPassword,
+    final response = await _dio.patch(ApiEndpoints.usersPassword, data: {
+      'password': newPassword,
+      'confirmPassword': newPassword,
     });
     return response.statusCode == 200 || response.statusCode == 201;
-  }
-
-  static Future<List<Map<String, dynamic>>> fetchSessions() async {
-    final response = await _dio.get(ApiEndpoints.sessions);
-    final data = response.data;
-    final items = data is Map<String, dynamic> ? data['data'] ?? data : data;
-    return (items as List)
-        .map((item) => item as Map<String, dynamic>)
-        .toList();
   }
 }

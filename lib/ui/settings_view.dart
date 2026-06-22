@@ -173,7 +173,6 @@ class _SettingsViewState extends State<SettingsView> {
         name: fullnameCtrl.text.trim(),
         email: emailCtrl.text.trim(),
         phone: phoneCtrl.text.trim(),
-        avatarUrl: _avatarUrl,
       );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -207,7 +206,6 @@ class _SettingsViewState extends State<SettingsView> {
     setState(() => _isChangingPassword = true);
     try {
       final success = await UserService.changePassword(
-        oldPassword: oldPasswordCtrl.text.trim(),
         newPassword: newPasswordCtrl.text.trim(),
       );
       if (!mounted) return;

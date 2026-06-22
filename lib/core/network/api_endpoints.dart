@@ -3,14 +3,9 @@ class ApiEndpoints {
 
   static const String register = '/auth/register';
   static const String login = '/auth/login';
-  static const String googleAuth = '/auth/google';
-  static const String logout = '/auth/logout';
-  static const String verifyToken = '/auth/verify';
   static const String refreshToken = '/auth/refresh-token';
   static const String forgotPassword = '/auth/forgot-password';
   static const String resetPassword = '/auth/reset-password';
-  static const String changePassword = '/auth/change-password';
-  static const String sessions = '/auth/sessions';
 
   static const String signalementCitoyen = '/signalement-citoyen';
   static const String categorieSignalement = '/categorie-signalement';
@@ -43,7 +38,9 @@ class ApiEndpoints {
   static const String librairiePublic = '/librairie/public';
 
   static const String usersDetail = '/users/detail';
-  static const String usersAvatar = '/users/avatar';
+  // Mise à jour du profil et de l'avatar : PATCH /users (multipart, champ `image`)
+  static const String usersUpdate = '/users';
+  static const String usersPassword = '/users/password';
 
-  static const String notificationsRegister = '/notifications/register-device';
+  static const String notificationsRegister = '/notification/register-device';
 }
