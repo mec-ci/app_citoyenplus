@@ -74,6 +74,17 @@ jobs:
           keyPassword=$ANDROID_KEY_PASSWORD
           EOF
 
+      # Génère assets/.env à partir des secrets. Le fichier est ignoré par git,
+      # donc absent du dépôt : sans cette étape, dotenv.load échouait dans l'APK
+      # et l'app restait sur un écran blanc au démarrage. On écrit toujours le
+      # fichier (vide si aucun secret), ce qui suffit à initialiser dotenv.
+      - name: Generate .env
+        run: |
+          cat > assets/.env <<EOF
+          GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
+          DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}
+          EOF
+
       - name: Build release APK
         run: flutter build apk --release
 
