@@ -1,0 +1,4 @@
+-keep class com.mec.citoyenplus.** { *; }
+-keep class com.devs.ebook.** { *; }
+-keep class com.example.on_mec.** { *; }
+-dontwarn com.example.on_mec.**
