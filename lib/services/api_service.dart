@@ -21,27 +21,32 @@ class ApiService {
   }
 
   // ── Quiz – Résultat ────────────────────────────────────────────────────────
+  /// Soumet le résultat d'un quiz au backend (`POST /quizz/submit`).
+  ///
+  /// Forme attendue par le backend (aucune modification serveur) :
+  /// `{ userId, quizId, answers: [{ questionId, choiceId }] }`.
+  /// Le `userId` provient de l'utilisateur connecté (côté mobile).
   static Future<bool> postQuizResult({
     required String userId,
     required String quizId,
-    required int score,
-    required int total,
     required List<Map<String, dynamic>> answers,
-    required List<double> timePerQuestion,
   }) async {
-    try {
-      final response = await _dio.post(ApiEndpoints.quizzSubmit, data: {
-        'userId': userId,
-        'quizId': quizId,
-        'score': score,
-        'total': total,
-        'answers': answers,
-        'timePerQuestion': timePerQuestion,
-      });
-      return response.statusCode == 200 || response.statusCode == 201;
-    } catch (_) {
-      return false;
-    }
+    final response = await _dio.post(ApiEndpoints.quizzSubmit, data: {
+      'userId': userId,
+      'quizId': quizId,
+      'answers': answers,
+    });
+    return response.statusCode == 200 || response.statusCode == 201;
+  }
+
+  /// Récupère les résultats de quiz d'un utilisateur (`GET /quizz/results/:userId`).
+  static Future<List<Map<String, dynamic>>> fetchQuizResults(
+    String userId,
+  ) async {
+    final response = await _dio.get(ApiEndpoints.quizzResultsByUser(userId));
+    final data = response.data;
+    final items = data is Map<String, dynamic> ? data['data'] ?? data : data;
+    return (items as List).map((e) => e as Map<String, dynamic>).toList();
   }
 
   static Future<List<PostModel>> fetchPosts({int page = 1, int limit = 20}) async {
@@ -92,6 +97,9 @@ class ApiService {
         .toList();
   }
 
+  /// Charge les catégories de quiz depuis l'API (`GET /quizz/categories`).
+  /// En cas d'indisponibilité réseau (hors-ligne), repli EXPLICITE sur les
+  /// données mock locales pour ne pas bloquer l'utilisateur.
   static Future<List<Map<String, dynamic>>> fetchQuizCategories() async {
     try {
       final response = await _dio.get(ApiEndpoints.quizzCategories);
@@ -101,10 +109,13 @@ class ApiService {
           .map((item) => item as Map<String, dynamic>)
           .toList();
     } on DioException {
+      // Fallback offline explicite : données mock locales.
       return _mockQuizCategories;
     }
   }
 
+  /// Charge les quiz depuis l'API (`GET /quizz`).
+  /// Repli EXPLICITE sur le mock local en cas d'erreur réseau (offline).
   static Future<List<Map<String, dynamic>>> fetchQuizzes() async {
     try {
       final response = await _dio.get(ApiEndpoints.quizz);
@@ -114,6 +125,7 @@ class ApiService {
           .map((item) => item as Map<String, dynamic>)
           .toList();
     } on DioException {
+      // Fallback offline explicite : données mock locales.
       return _mockQuizzes;
     }
   }

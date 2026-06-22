@@ -1,6 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../providers/gamification_provider.dart';
+import '../services/api_service.dart';
+import '../services/user_service.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'quiz_score_screen.dart';
 
@@ -148,6 +152,9 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
         .read(gamificationProvider.notifier)
         .addPoints(totalPoints, raison: 'quiz:${widget.categorie}:niveau${widget.level}');
 
+    // Persiste le résultat du quiz côté serveur (best-effort, repli local).
+    _submitQuizResult();
+
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
@@ -164,6 +171,60 @@ class _QuizquestionsState extends ConsumerState<Quizquestions>
         ),
       ),
     );
+  }
+
+  /// Soumet le résultat au backend `POST /quizz/submit` avec le userId de
+  /// l'utilisateur connecté. En cas d'échec (hors-ligne / erreur), on met le
+  /// résultat en file d'attente locale pour un envoi ultérieur.
+  ///
+  /// NB : les questions proviennent de la banque locale (indices entiers).
+  /// On mappe donc `questionId`/`choiceId` sur les indices (en chaîne) et on
+  /// construit un `quizId` stable à partir de la catégorie et du niveau.
+  Future<void> _submitQuizResult() async {
+    final quizId = 'quiz:${widget.categorie}:niveau${widget.level}';
+    final payloadAnswers = _answers
+        .map((a) => {
+              'questionId': a['questionId'].toString(),
+              'choiceId': (a['selectedChoice'] as int).toString(),
+            })
+        .toList();
+
+    final userId = await UserService.currentUserId();
+    if (userId == null) {
+      await _cachePendingResult(quizId, payloadAnswers, userId: null);
+      return;
+    }
+
+    try {
+      final ok = await ApiService.postQuizResult(
+        userId: userId,
+        quizId: quizId,
+        answers: payloadAnswers,
+      );
+      if (!ok) {
+        await _cachePendingResult(quizId, payloadAnswers, userId: userId);
+      }
+    } catch (_) {
+      // Repli local : on conserve le résultat pour un renvoi ultérieur.
+      await _cachePendingResult(quizId, payloadAnswers, userId: userId);
+    }
+  }
+
+  Future<void> _cachePendingResult(
+    String quizId,
+    List<Map<String, dynamic>> answers, {
+    required String? userId,
+  }) async {
+    final prefs = await SharedPreferences.getInstance();
+    const key = 'pending_quiz_results';
+    final list = prefs.getStringList(key) ?? <String>[];
+    list.add(jsonEncode({
+      'userId': userId,
+      'quizId': quizId,
+      'answers': answers,
+      'savedAt': DateTime.now().toIso8601String(),
+    }));
+    await prefs.setStringList(key, list);
   }
 
   @override

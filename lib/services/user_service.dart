@@ -13,6 +13,23 @@ class UserService {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Récupère l'identifiant de l'utilisateur connecté à partir de son profil.
+  /// Le backend déduit l'utilisateur du token ; on récupère son id pour le
+  /// passer explicitement dans le body de soumission des quiz.
+  static Future<String?> currentUserId() async {
+    try {
+      final data = await fetchProfile();
+      final user = data['data'] is Map
+          ? (data['data'] as Map).cast<String, dynamic>()
+          : data;
+      final id = user['id'] ?? user['_id'] ?? user['uid'];
+      final value = id?.toString();
+      return (value == null || value.isEmpty) ? null : value;
+    } catch (_) {
+      return null;
+    }
+  }
+
   static Future<Map<String, dynamic>> fetchProfileById(String userId) async {
     final response = await _dio.get('/users/$userId');
     return response.data as Map<String, dynamic>;

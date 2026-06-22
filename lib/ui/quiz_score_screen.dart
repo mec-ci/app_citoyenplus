@@ -1,6 +1,8 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api_service.dart';
+import '../services/user_service.dart';
 
 const _orange = Color(0xFFE65C00);
 const _blue = Color(0xFF1556B5);
@@ -43,10 +45,15 @@ class _QuizScoreScreenState extends State<QuizScoreScreen>
   late List<_ConfettiParticle> _particles;
   bool _showConfetti = false;
 
+  // Progression chargée depuis le serveur (GET /quizz/results/:userId).
+  int? _completedQuizCount;
+  bool _loadingResults = true;
+
   @override
   void initState() {
     super.initState();
     _particles = List.generate(60, (_) => _ConfettiParticle());
+    _loadServerResults();
     _pointsCtrl = AnimationController(
       vsync: this,
       duration: Duration(milliseconds: (widget.totalPoints * 15).clamp(800, 2500)),
@@ -62,6 +69,25 @@ class _QuizScoreScreenState extends State<QuizScoreScreen>
 
     if (widget.passed && widget.level < 3) {
       _unlockNextLevel();
+    }
+  }
+
+  /// Charge la progression de l'utilisateur depuis le serveur pour l'afficher.
+  Future<void> _loadServerResults() async {
+    try {
+      final userId = await UserService.currentUserId();
+      if (userId == null) {
+        if (mounted) setState(() => _loadingResults = false);
+        return;
+      }
+      final results = await ApiService.fetchQuizResults(userId);
+      if (!mounted) return;
+      setState(() {
+        _completedQuizCount = results.length;
+        _loadingResults = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingResults = false);
     }
   }
 
@@ -254,6 +280,11 @@ class _QuizScoreScreenState extends State<QuizScoreScreen>
                 ),
                 const SizedBox(height: 12),
 
+                // Progression globale (serveur)
+                _buildServerProgress(),
+                if (!_loadingResults && _completedQuizCount != null)
+                  const SizedBox(height: 12),
+
                 // Détail rapide
                 if (widget.timePerQuestion.isNotEmpty)
                   Container(
@@ -383,6 +414,44 @@ class _QuizScoreScreenState extends State<QuizScoreScreen>
                 ),
                 const SizedBox(height: 32),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServerProgress() {
+    if (_loadingResults) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 8),
+        child: SizedBox(
+          height: 18,
+          width: 18,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    if (_completedQuizCount == null) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: _blue.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _blue.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.checklist_rounded, color: _blue, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              '$_completedQuizCount quiz complétés au total',
+              style: const TextStyle(
+                color: _blue,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
             ),
           ),
         ],

@@ -26,8 +26,7 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
   bool _isNavigating = false;
 
   int signalementCount = 0;
-  int quizScore = 0;
-  int quizTotal = 0;
+  int quizCompletedCount = 0;
   List<SignalementModel> mesSignalements = [];
 
   static const _orange = Color(0xFFE65C00);
@@ -82,6 +81,15 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
         signalementCount = signalements.length;
         mesSignalements = signalements.take(3).toList();
       });
+    } catch (_) {}
+    // Charge le nombre de quiz complétés depuis le serveur.
+    try {
+      final userId = widget.userId ?? await UserService.currentUserId();
+      if (userId != null) {
+        final results = await ApiService.fetchQuizResults(userId);
+        if (!mounted) return;
+        setState(() => quizCompletedCount = results.length);
+      }
     } catch (_) {}
   }
 
@@ -313,6 +321,21 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
           Text(
             'Signalez des problemes et participez a des actions pour monter de niveau',
             style: TextStyle(fontSize: 10, color: Colors.grey[400]),
+          ),
+          const SizedBox(height: 10),
+          Row(
+            children: [
+              const Icon(Icons.checklist_rounded, color: _blue, size: 16),
+              const SizedBox(width: 6),
+              Text(
+                '$quizCompletedCount quiz complétés',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: _blue,
+                ),
+              ),
+            ],
           ),
         ],
       ),
