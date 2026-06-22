@@ -10,6 +10,9 @@ class PostModel {
   final DateTime date;
   final DateTime? createdAt;
   final DateTime? updatedAt;
+  final int? likesCount;
+  final int? commentsCount;
+  final bool? likedByMe;
 
   PostModel({
     required this.id,
@@ -21,6 +24,9 @@ class PostModel {
     required this.date,
     this.createdAt,
     this.updatedAt,
+    this.likesCount,
+    this.commentsCount,
+    this.likedByMe,
   });
 
   factory PostModel.fromJson(Map<String, dynamic> json) {
@@ -41,6 +47,9 @@ class PostModel {
           : DateTime.now(),
       createdAt: _tryParseDate(json['createdAt']),
       updatedAt: _tryParseDate(json['updatedAt']),
+      likesCount: (json['likesCount'] as num?)?.toInt(),
+      commentsCount: (json['commentsCount'] as num?)?.toInt(),
+      likedByMe: json['likedByMe'] as bool?,
     );
   }
 

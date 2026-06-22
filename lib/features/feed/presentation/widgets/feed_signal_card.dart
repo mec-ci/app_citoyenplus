@@ -1,5 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:citoyen_plus/features/feed/domain/models/feed_item.dart';
+import 'package:citoyen_plus/services/commentaire_service.dart';
+import 'package:citoyen_plus/services/reaction_service.dart';
+import 'package:citoyen_plus/widgets/commentaires_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -13,8 +16,16 @@ class FeedSignalCard extends StatefulWidget {
 }
 
 class _FeedSignalCardState extends State<FeedSignalCard> {
-  bool _liked = false;
-  int _likeCount = 0;
+  late bool _liked;
+  late int _likeCount;
+  bool _likeInFlight = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _liked = widget.item.likedByMe ?? false;
+    _likeCount = widget.item.likesCount ?? 0;
+  }
 
   Color get _statusColor {
     switch (widget.item.statut?.toLowerCase()) {
@@ -59,11 +70,40 @@ class _FeedSignalCardState extends State<FeedSignalCard> {
     }
   }
 
-  void _toggleLike() {
+  Future<void> _toggleLike() async {
+    if (_likeInFlight) return;
+    final previousLiked = _liked;
+    final previousCount = _likeCount;
     setState(() {
+      _likeInFlight = true;
       _liked = !_liked;
       _likeCount += _liked ? 1 : -1;
+      if (_likeCount < 0) _likeCount = 0;
     });
+    try {
+      final result = await ReactionService.toggleSignalement(widget.item.id);
+      if (!mounted) return;
+      setState(() {
+        _liked = result.liked;
+        _likeCount = result.likesCount;
+        _likeInFlight = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _liked = previousLiked;
+        _likeCount = previousCount;
+        _likeInFlight = false;
+      });
+    }
+  }
+
+  void _openComments() {
+    showCommentairesSheet(
+      context,
+      cible: CommentaireCible.signalement,
+      id: widget.item.id,
+    );
   }
 
   void _share() {
@@ -276,6 +316,21 @@ class _FeedSignalCardState extends State<FeedSignalCard> {
                               icon: Icons.flag_outlined,
                               onTap: _flag,
                             ),
+                            const SizedBox(width: 8),
+                            _ActionButton(
+                              icon: Icons.mode_comment_outlined,
+                              onTap: _openComments,
+                            ),
+                            if ((widget.item.commentsCount ?? 0) > 0) ...[
+                              const SizedBox(width: 2),
+                              Text(
+                                '${widget.item.commentsCount}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
                             const SizedBox(width: 8),
                             _ActionButton(
                               icon: _liked

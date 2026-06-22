@@ -17,6 +17,18 @@ class ApiEndpoints {
 
   static const String actualites = '/actualites';
 
+  // ── Réactions (likes) ──────────────────────────────────────────────────────
+  static String signalementReactionToggle(String id) =>
+      '/signalement-citoyen/$id/reactions/toggle';
+  static String actualiteReactionToggle(String id) =>
+      '/actualites/$id/reactions/toggle';
+
+  // ── Commentaires ───────────────────────────────────────────────────────────
+  static String signalementCommentaires(String id) =>
+      '/signalement-citoyen/$id/commentaires';
+  static String actualiteCommentaires(String id) =>
+      '/actualites/$id/commentaires';
+
   static const String quizz = '/quizz';
   static const String quizzCategories = '/quizz/categories';
   static const String quizzSubmit = '/quizz/submit';

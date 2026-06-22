@@ -16,6 +16,9 @@ class SignalementModel {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final DateTime? deletedAt;
+  final int? likesCount;
+  final int? commentsCount;
+  final bool? likedByMe;
 
   SignalementModel({
     required this.id,
@@ -33,6 +36,9 @@ class SignalementModel {
     this.createdAt,
     this.updatedAt,
     this.deletedAt,
+    this.likesCount,
+    this.commentsCount,
+    this.likedByMe,
   });
 
   factory SignalementModel.fromJson(Map<String, dynamic> json) {
@@ -66,6 +72,9 @@ class SignalementModel {
       deletedAt: json['deletedAt'] != null
           ? DateTime.tryParse(json['deletedAt'].toString())
           : null,
+      likesCount: (json['likesCount'] as num?)?.toInt(),
+      commentsCount: (json['commentsCount'] as num?)?.toInt(),
+      likedByMe: json['likedByMe'] as bool?,
     );
   }
 
