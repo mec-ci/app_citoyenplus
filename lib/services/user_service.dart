@@ -100,11 +100,13 @@ class UserService {
   }
 
   /// Change le mot de passe via PATCH /users/password.
-  /// Le backend attend `password` et `confirmPassword`.
+  /// Le backend attend `oldPassword`, `password` et `confirmPassword`.
   static Future<bool> changePassword({
+    required String oldPassword,
     required String newPassword,
   }) async {
     final response = await _dio.patch(ApiEndpoints.usersPassword, data: {
+      'oldPassword': oldPassword,
       'password': newPassword,
       'confirmPassword': newPassword,
     });

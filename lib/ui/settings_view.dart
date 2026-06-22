@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:local_auth/local_auth.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
 import 'login.dart';
@@ -14,8 +12,6 @@ class SettingsView extends StatefulWidget {
 }
 
 class _SettingsViewState extends State<SettingsView> {
-  final _storage = const FlutterSecureStorage();
-  final _auth = LocalAuthentication();
   final _picker = ImagePicker();
 
   late TextEditingController fullnameCtrl;
@@ -30,8 +26,6 @@ class _SettingsViewState extends State<SettingsView> {
   bool _isChangingPassword = false;
   bool _isLoggingOut = false;
   bool _isUpdatingAvatar = false;
-  bool _biometricSupported = false;
-  bool _biometricEnabled = false;
   String? _avatarUrl;
 
   static const _orange = Color(0xFFE65C00);
@@ -62,7 +56,6 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   Future<void> _initialize() async {
-    await _loadBiometricSupport();
     await _loadProfile();
   }
 
@@ -89,17 +82,6 @@ class _SettingsViewState extends State<SettingsView> {
     );
   }
 
-  Future<void> _loadBiometricSupport() async {
-    final canCheckBiometrics = await _auth.canCheckBiometrics;
-    final enabled = await _storage.read(key: 'biometric_enabled') == 'true';
-    if (mounted) {
-      setState(() {
-        _biometricSupported = canCheckBiometrics;
-        _biometricEnabled = enabled;
-      });
-    }
-  }
-
   Future<void> _loadProfile() async {
     try {
       final data = await UserService.fetchProfile();
@@ -118,27 +100,6 @@ class _SettingsViewState extends State<SettingsView> {
         SnackBar(content: Text('Erreur chargement profil: $e')),
       );
     }
-  }
-
-  Future<void> _toggleBiometric(bool value) async {
-    if (!_biometricSupported) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Biométrie non disponible sur cet appareil.')),
-      );
-      return;
-    }
-
-    if (value) {
-      final authenticated = await _auth.authenticate(
-        localizedReason: 'Active la connexion biométrique pour Citoyen +',
-        options: const AuthenticationOptions(biometricOnly: true),
-      );
-      if (!authenticated) return;
-    }
-
-    await _storage.write(key: 'biometric_enabled', value: value ? 'true' : 'false');
-    if (!mounted) return;
-    setState(() => _biometricEnabled = value);
   }
 
   Future<void> _pickAndUploadAvatar() async {
@@ -206,6 +167,7 @@ class _SettingsViewState extends State<SettingsView> {
     setState(() => _isChangingPassword = true);
     try {
       final success = await UserService.changePassword(
+        oldPassword: oldPasswordCtrl.text.trim(),
         newPassword: newPasswordCtrl.text.trim(),
       );
       if (!mounted) return;
@@ -310,17 +272,6 @@ class _SettingsViewState extends State<SettingsView> {
                     ),
                   ),
                   const SizedBox(height: 28),
-
-                  const Text('Sécurité', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 14),
-                  SwitchListTile(
-                    title: const Text('Connexion biométrique'),
-                    subtitle: Text(_biometricSupported ? 'Utilise empreinte ou reconnaissance faciale' : 'Biométrie non supportée'),
-                    value: _biometricEnabled,
-                    activeThumbColor: _orange,
-                    onChanged: _biometricSupported ? _toggleBiometric : null,
-                  ),
-                  const Divider(height: 32),
 
                   const Text('Changer le mot de passe', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 14),

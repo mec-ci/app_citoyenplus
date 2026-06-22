@@ -3,6 +3,8 @@ class ApiEndpoints {
 
   static const String register = '/auth/register';
   static const String login = '/auth/login';
+  static const String verifyEmail = '/auth/verify-email';
+  static const String resendEmailOtp = '/auth/resend-email-otp';
   static const String refreshToken = '/auth/refresh-token';
   static const String forgotPassword = '/auth/forgot-password';
   static const String resetPassword = '/auth/reset-password';
