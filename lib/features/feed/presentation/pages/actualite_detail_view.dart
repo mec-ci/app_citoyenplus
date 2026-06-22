@@ -31,6 +31,7 @@ class _ActualiteDetailViewState extends State<ActualiteDetailView> {
 
   late bool _liked;
   late int _likeCount;
+  late int _commentCount;
   bool _likeInFlight = false;
 
   static const _months = [
@@ -53,6 +54,7 @@ class _ActualiteDetailViewState extends State<ActualiteDetailView> {
     super.initState();
     _liked = widget.item.likedByMe ?? false;
     _likeCount = widget.item.likesCount ?? 0;
+    _commentCount = widget.item.commentsCount ?? 0;
     _loadDetail();
   }
 
@@ -118,6 +120,9 @@ class _ActualiteDetailViewState extends State<ActualiteDetailView> {
       context,
       cible: CommentaireCible.actualite,
       id: widget.item.id,
+      onCountChanged: (count) {
+        if (mounted) setState(() => _commentCount = count);
+      },
     );
   }
 
@@ -310,9 +315,7 @@ class _ActualiteDetailViewState extends State<ActualiteDetailView> {
             ),
             _BarButton(
               icon: Icons.mode_comment_outlined,
-              label: (widget.item.commentsCount ?? 0) > 0
-                  ? '${widget.item.commentsCount}'
-                  : 'Commenter',
+              label: _commentCount > 0 ? '$_commentCount' : 'Commenter',
               onTap: _openComments,
             ),
             _BarButton(

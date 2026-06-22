@@ -26,6 +26,10 @@ class ApiEndpoints {
       '/signalement-citoyen/$id/commentaires';
   static String actualiteCommentaires(String id) =>
       '/actualites/$id/commentaires';
+  static String signalementCommentaireById(String id, String commentaireId) =>
+      '/signalement-citoyen/$id/commentaires/$commentaireId';
+  static String actualiteCommentaireById(String id, String commentaireId) =>
+      '/actualites/$id/commentaires/$commentaireId';
 
   static const String quizz = '/quizz';
   static const String quizzCategories = '/quizz/categories';

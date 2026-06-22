@@ -19,6 +19,7 @@ class FeedActualiteCard extends StatefulWidget {
 class _FeedActualiteCardState extends State<FeedActualiteCard> {
   late bool _liked;
   late int _likeCount;
+  late int _commentCount;
   bool _likeInFlight = false;
 
   @override
@@ -26,6 +27,7 @@ class _FeedActualiteCardState extends State<FeedActualiteCard> {
     super.initState();
     _liked = widget.item.likedByMe ?? false;
     _likeCount = widget.item.likesCount ?? 0;
+    _commentCount = widget.item.commentsCount ?? 0;
   }
 
   Future<void> _toggleLike() async {
@@ -61,6 +63,9 @@ class _FeedActualiteCardState extends State<FeedActualiteCard> {
       context,
       cible: CommentaireCible.actualite,
       id: widget.item.id,
+      onCountChanged: (count) {
+        if (mounted) setState(() => _commentCount = count);
+      },
     );
   }
 
@@ -232,10 +237,10 @@ class _FeedActualiteCardState extends State<FeedActualiteCard> {
                               icon: Icons.mode_comment_outlined,
                               onTap: _openComments,
                             ),
-                            if ((widget.item.commentsCount ?? 0) > 0) ...[
+                            if (_commentCount > 0) ...[
                               const SizedBox(width: 2),
                               Text(
-                                '${widget.item.commentsCount}',
+                                '$_commentCount',
                                 style: const TextStyle(
                                   fontSize: 10,
                                   color: Colors.grey,
