@@ -1,13 +1,65 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/network/dio_client.dart';
 import '../core/network/api_endpoints.dart';
 import '../models/post.dart';
 import '../models/signalement.dart';
 import '../models/quiz.dart';
+import 'user_service.dart';
 
 class ApiService {
   static final Dio _dio = DioClient.getInstance();
+
+  static const String _pendingQuizKey = 'pending_quiz_results';
+
+  /// Renvoie au serveur les résultats de quiz mis en file d'attente hors-ligne
+  /// (`pending_quiz_results`). Les entrées envoyées avec succès sont retirées ;
+  /// celles qui échouent restent en file pour une prochaine tentative.
+  /// Renvoie le nombre d'entrées effectivement synchronisées.
+  static Future<int> flushPendingQuizResults() async {
+    final prefs = await SharedPreferences.getInstance();
+    final list = prefs.getStringList(_pendingQuizKey) ?? const <String>[];
+    if (list.isEmpty) return 0;
+
+    final remaining = <String>[];
+    var synced = 0;
+    for (final raw in list) {
+      try {
+        final data = jsonDecode(raw) as Map<String, dynamic>;
+        final quizId = data['quizId']?.toString();
+        final answers = (data['answers'] as List?)
+                ?.map((e) => (e as Map).cast<String, dynamic>())
+                .toList() ??
+            const <Map<String, dynamic>>[];
+        final userId =
+            data['userId']?.toString() ?? await UserService.currentUserId();
+
+        if (quizId == null || quizId.isEmpty || userId == null || answers.isEmpty) {
+          remaining.add(raw); // entrée inexploitable, on la conserve
+          continue;
+        }
+
+        final result = await postQuizResult(
+          userId: userId,
+          quizId: quizId,
+          answers: answers,
+        );
+        if (result == null) {
+          remaining.add(raw); // échec → on réessaiera plus tard
+        } else {
+          synced++;
+        }
+      } catch (_) {
+        remaining.add(raw); // erreur réseau → conservé
+      }
+    }
+
+    await prefs.setStringList(_pendingQuizKey, remaining);
+    return synced;
+  }
 
   // ── Points ─────────────────────────────────────────────────────────────────
   static Future<bool> syncPoints(int amount) async {

@@ -70,6 +70,8 @@ class _QuizViewState extends State<QuizView> {
   void initState() {
     super.initState();
     _loadCategories();
+    // Renvoie au serveur les résultats de quiz mis en attente hors-ligne.
+    ApiService.flushPendingQuizResults();
   }
 
   Future<void> _loadProgress() async {

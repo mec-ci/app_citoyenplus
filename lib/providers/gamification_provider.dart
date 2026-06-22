@@ -103,6 +103,15 @@ class GamificationNotifier extends StateNotifier<GamificationState> {
     await _syncPending(raison: raison);
   }
 
+  /// Affiche uniquement l'animation de gain de points, SANS modifier le total
+  /// ni poster au serveur. À utiliser quand les points sont attribués côté
+  /// serveur (ex. complétion de quiz) afin d'éviter un double comptage ;
+  /// appeler ensuite [refresh] pour adopter le total serveur.
+  void celebrate(int amount) {
+    if (amount <= 0) return;
+    state = state.copyWith(lastPointsGained: amount, showCelebration: true);
+  }
+
   void dismissCelebration() {
     state = state.copyWith(showCelebration: false, lastPointsGained: 0);
   }
