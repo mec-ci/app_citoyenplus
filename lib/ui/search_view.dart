@@ -41,18 +41,45 @@ class _SearchViewState extends State<SearchView> {
     final results = await Future.wait([
       ApiService.search(query).catchError((_) => <String, dynamic>{}),
       ApiService.fetchPosts(page: 1, limit: 5).catchError((_) => <PostModel>[]),
-      ApiService.fetchSignalements(page: 1, limit: 5).catchError((_) => <SignalementModel>[]),
+      // On récupère une page large de signalements puis on filtre localement
+      // sur le mot-clé (titre, description, adresse, catégorie), car l'endpoint
+      // signalements ne prend pas de paramètre de recherche textuelle.
+      ApiService.fetchSignalements(page: 1, limit: 50)
+          .catchError((_) => <SignalementModel>[]),
       ApiService.fetchLibraryDocuments(query).catchError((_) => <Map<String, dynamic>>[]),
       ApiService.fetchQuizCategories().catchError((_) => <Map<String, dynamic>>[]),
     ]);
 
+    final allSignalements = results[2] as List<SignalementModel>;
+    final filteredSignalements = _filterSignalements(allSignalements, query);
+
     return {
       'search': results[0] as Map<String, dynamic>,
       'posts': results[1] as List<PostModel>,
-      'signalements': results[2] as List<SignalementModel>,
+      'signalements': filteredSignalements,
       'documents': results[3] as List<Map<String, dynamic>>,
       'quizCategories': results[4] as List<Map<String, dynamic>>,
     };
+  }
+
+  /// Filtre localement les signalements sur le mot-clé recherché. La
+  /// correspondance est insensible à la casse et porte sur le titre, la
+  /// description, l'adresse et le nom de la catégorie.
+  List<SignalementModel> _filterSignalements(
+    List<SignalementModel> signalements,
+    String query,
+  ) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return signalements;
+    return signalements.where((s) {
+      final haystack = [
+        s.titre,
+        s.description,
+        s.adresse,
+        s.categorie?.nom ?? '',
+      ].join(' ').toLowerCase();
+      return haystack.contains(q);
+    }).toList();
   }
 
   @override
