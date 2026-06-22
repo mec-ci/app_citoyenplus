@@ -1,156 +1,190 @@
-import 'dart:convert';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:dio/dio.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:citoyen_plus/core/network/dio_client.dart';
+import 'package:citoyen_plus/core/network/api_endpoints.dart';
 
 class AuthService {
-  static const String baseUrl = 'https://admin.mec-ci.org/api/v1';
+  static final Dio _dio = DioClient.getInstance();
+  static final FlutterSecureStorage _storage = const FlutterSecureStorage();
 
-  // INSCRIPTION
+  static const String _accessTokenKey = 'accessToken';
+  static const String _refreshTokenKey = 'refreshToken';
+
   static Future<Map<String, dynamic>> signup({
     required String name,
     required String email,
     required String phone,
     required String password,
   }) async {
-    final url = Uri.parse("$baseUrl/auth/register");
-
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
+      final response = await _dio.post(
+        ApiEndpoints.register,
+        data: {
+          'fullname': name,
+          'email': email,
+          'phone': phone,
+          'password': password,
         },
-        body: jsonEncode({
-          "fullname": name,
-          "email": email,
-          "phone": phone,
-          "password": password,
-        }),
       );
 
-      if (!response.headers['content-type']!.contains('application/json')) {
-        return {"success": false, "message": "Réponse invalide du serveur"};
+      final data = response.data as Map<String, dynamic>;
+      if (data['token'] != null) {
+        await DioClient.saveTokens(
+          accessToken: data['token'],
+          refreshToken: data['refreshToken'],
+        );
       }
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        // Sauvegarde du token si existant
-        if (data['token'] != null) {
-          await saveToken(data['token']);
-        }
-
-        return {"success": true, "data": data};
-      } else {
-        dynamic message = data["message"];
-
-        // Si le message est une liste, on prend le premier élément
-        if (message is List && message.isNotEmpty) {
-          message = message.join("\n");
-        }
-
-        // Si ce n'est pas une String
-        if (message is! String) {
-          message = "Erreur lors de l'inscription";
-        }
-
-        return {"success": false, "message": message};
-      }
-    } catch (_) {
-      return {
-        "success": false,
-        "message": "Erreur réseau, réessaie encore 🙏🏾",
-      };
+      return {'success': true, 'data': data};
+    } on DioException catch (e) {
+      final message = _extractMessage(e);
+      return {'success': false, 'message': message};
     }
   }
 
-  // CONNEXION
   static Future<Map<String, dynamic>> login({
     required String email,
     required String password,
   }) async {
-    final url = Uri.parse("$baseUrl/auth/login");
-
     try {
-      final response = await http.post(
-        url,
-        headers: {"Accept": "application/json"},
-        body: {"email": email, "password": password},
+      final response = await _dio.post(
+        ApiEndpoints.login,
+        data: {'email': email, 'password': password},
       );
 
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        if (data['token'] != null) {
-          await saveToken(data['token']);
-        }
-        return {"success": true, "data": data};
-      } else {
-        return {
-          "success": false,
-          "message": data["message"] ?? "Email ou mot de passe incorrect",
-        };
+      final data = response.data as Map<String, dynamic>;
+      if (data['token'] != null) {
+        await DioClient.saveTokens(
+          accessToken: data['token'],
+          refreshToken: data['refreshToken'],
+        );
       }
-    } catch (e) {
-      return {"success": false, "message": "Impossible de se connecter"};
+      return {'success': true, 'data': data};
+    } on DioException catch (e) {
+      final message = _extractMessage(e);
+      return {'success': false, 'message': message};
     }
   }
 
-  // 🔑 MÉTHODES DE GESTION DU TOKEN
-  static Future<void> saveToken(String token) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('token', token);
+  static Future<Map<String, dynamic>> loginWithGoogle() async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.googleAuth,
+        data: {'idToken': '', 'accessToken': ''},
+      );
+      final data = response.data as Map<String, dynamic>;
+      if (data['token'] != null) {
+        await DioClient.saveTokens(
+          accessToken: data['token'],
+          refreshToken: data['refreshToken'],
+        );
+      }
+      return {'success': true, 'data': data};
+    } on DioException catch (e) {
+      final message = _extractMessage(e);
+      return {'success': false, 'message': message};
+    }
   }
 
-  static Future<String?> getToken(data) async {
-    final prefs = await SharedPreferences.getInstance();
-    
-    return prefs.getString('token');
-    
+  static Future<bool> isAuthenticated() async {
+    final token = await _storage.read(key: _accessTokenKey);
+    if (token == null) return false;
+    try {
+      await _dio.get(ApiEndpoints.verifyToken);
+      return true;
+    } catch (_) {
+      return false;
+    }
   }
 
-  // MOT DE PASSE OUBLIÉ
+  static Future<bool> refreshToken() async {
+    final refreshToken = await _storage.read(key: _refreshTokenKey);
+    if (refreshToken == null) return false;
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.refreshToken,
+        data: {'refreshToken': refreshToken},
+      );
+      final data = response.data as Map<String, dynamic>;
+      if (data['token'] != null) {
+        await DioClient.saveTokens(
+          accessToken: data['token'],
+          refreshToken: data['refreshToken'],
+        );
+        return true;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<Map<String, dynamic>> forgotPassword({
     required String email,
   }) async {
-    final url = Uri.parse("$baseUrl/auth/forgot-password");
-
     try {
-      final response = await http.post(
-        url,
-        headers: {
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-        },
-        body: jsonEncode({"email": email}),
+      final response = await _dio.post(
+        ApiEndpoints.forgotPassword,
+        data: {'email': email},
       );
-
-      final contentType = response.headers['content-type'] ?? '';
-      if (!contentType.contains('application/json')) {
-        return {"success": false, "message": "Réponse invalide du serveur"};
-      }
-
-      final data = jsonDecode(response.body);
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return {
-          "success": true,
-          "message": data["message"] ?? "Un email de réinitialisation a été envoyé.",
-        };
-      } else {
-        dynamic message = data["message"];
-        if (message is List && message.isNotEmpty) message = message.join("\n");
-        if (message is! String) message = "Une erreur est survenue. Réessaie.";
-        return {"success": false, "message": message};
-      }
-    } catch (_) {
-      return {"success": false, "message": "Erreur réseau, réessaie encore 🙏🏾"};
+      final data = response.data as Map<String, dynamic>;
+      return {
+        'success': true,
+        'message': data['message'] ?? 'Un email de réinitialisation a été envoyé.',
+      };
+    } on DioException catch (e) {
+      return {'success': false, 'message': _extractMessage(e)};
     }
   }
 
   static Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('token');
+    try {
+      await _dio.post(ApiEndpoints.logout);
+    } catch (_) {}
+    await DioClient.clearTokens();
+    DioClient.reset();
+  }
+
+  static Future<Map<String, dynamic>> verifyRefreshToken({
+    required String refreshToken,
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiEndpoints.refreshToken,
+        data: {'refreshToken': refreshToken},
+      );
+      final data = response.data as Map<String, dynamic>;
+      if (data['token'] != null) {
+        await DioClient.saveTokens(
+          accessToken: data['token'],
+          refreshToken: data['refreshToken'],
+        );
+      }
+      return {'success': true, 'data': data};
+    } on DioException catch (e) {
+      return {'success': false, 'message': _extractMessage(e)};
+    }
+  }
+
+  static Future<String?> getToken() async {
+    return await _storage.read(key: _accessTokenKey);
+  }
+
+  static Future<void> saveToken(String token) async {
+    await _storage.write(key: _accessTokenKey, value: token);
+  }
+
+  static String _extractMessage(DioException e) {
+    final response = e.response;
+    if (response?.data is Map) {
+      final data = response!.data as Map;
+      return data['message']?.toString() ??
+          data['error']?.toString() ??
+          'Une erreur est survenue.';
+    }
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.connectionError) {
+      return 'Erreur réseau. Vérifiez votre connexion.';
+    }
+    return 'Une erreur est survenue.';
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'detail_page.dart';
 
-const _orange = Color(0xFFFF7F00);
+const _orange = Color(0xFFE65C00);
 const _blue = Color(0xFF1556B5);
 
 // ── Données enrichies par région ─────────────────────────────────────────────
@@ -127,8 +127,8 @@ class RegionsPage extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: color.withOpacity(0.12), width: 1.5),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 3))],
+                      border: Border.all(color: color.withValues(alpha: 0.12), width: 1.5),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 3))],
                     ),
                     child: Row(
                       children: [
@@ -136,7 +136,7 @@ class RegionsPage extends StatelessWidget {
                         Container(
                           width: 42, height: 42,
                           decoration: BoxDecoration(
-                            color: color.withOpacity(0.08),
+                            color: color.withValues(alpha: 0.08),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Center(
@@ -175,7 +175,7 @@ class RegionsPage extends StatelessWidget {
                         // Flèche
                         Container(
                           padding: const EdgeInsets.all(6),
-                          decoration: BoxDecoration(color: color.withOpacity(0.08), shape: BoxShape.circle),
+                          decoration: BoxDecoration(color: color.withValues(alpha: 0.08), shape: BoxShape.circle),
                           child: Icon(Icons.arrow_forward_ios, size: 12, color: color),
                         ),
                       ],

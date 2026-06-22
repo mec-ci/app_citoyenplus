@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../features/onboarding/onboarding_service.dart';
+import '../features/onboarding/onboarding_view.dart';
+import '../services/auth_service.dart';
 import 'accueil.dart';
 import 'login.dart';
 
@@ -18,7 +20,7 @@ class _SplashScreenState extends State<SplashScreen>
   late Animation<double> _scaleAnim;
   late Animation<double> _slideAnim;
 
-  static const _orange = Color(0xFFFF7F00);
+  static const _orange = Color(0xFFE65C00);
   static const _blue = Color(0xFF1556B5);
 
   @override
@@ -31,29 +33,68 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _fadeAnim = CurvedAnimation(parent: _ctrl, curve: Curves.easeIn);
-    _scaleAnim = Tween<double>(begin: 0.75, end: 1.0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut),
-    );
-    _slideAnim = Tween<double>(begin: 30, end: 0).animate(
-      CurvedAnimation(parent: _ctrl, curve: Curves.easeOut),
-    );
+    _scaleAnim = Tween<double>(
+      begin: 0.75,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.elasticOut));
+    _slideAnim = Tween<double>(
+      begin: 30,
+      end: 0,
+    ).animate(CurvedAnimation(parent: _ctrl, curve: Curves.easeOut));
 
     _ctrl.forward();
 
-    Future.delayed(const Duration(seconds: 3), () async {
+    Future.delayed(const Duration(seconds: 2), () async {
       if (!mounted) return;
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token') ?? '';
-      if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        PageRouteBuilder(
-          pageBuilder: (_, __, ___) =>
-              token.isNotEmpty ? const Home() : const LoginView(),
-          transitionsBuilder: (_, animation, __, child) =>
-              FadeTransition(opacity: animation, child: child),
-          transitionDuration: const Duration(milliseconds: 800),
-        ),
-      );
+      try {
+        final authenticated = await AuthService.isAuthenticated();
+        if (!mounted) return;
+
+        if (authenticated) {
+          final shouldShowOnboarding =
+              await OnboardingService.shouldShowOnboarding();
+          if (!mounted) return;
+          if (shouldShowOnboarding) {
+            Navigator.of(context).pushReplacement(
+              PageRouteBuilder(
+                pageBuilder: (_, __, ___) => const OnboardingView(),
+                transitionsBuilder: (_, animation, __, child) =>
+                    FadeTransition(opacity: animation, child: child),
+                transitionDuration: const Duration(milliseconds: 800),
+              ),
+            );
+            return;
+          }
+          Navigator.of(context).pushReplacement(
+            PageRouteBuilder(
+              pageBuilder: (_, __, ___) => const Home(),
+              transitionsBuilder: (_, animation, __, child) =>
+                  FadeTransition(opacity: animation, child: child),
+              transitionDuration: const Duration(milliseconds: 800),
+            ),
+          );
+          return;
+        }
+
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => const LoginView(),
+            transitionsBuilder: (_, animation, __, child) =>
+                FadeTransition(opacity: animation, child: child),
+            transitionDuration: const Duration(milliseconds: 800),
+          ),
+        );
+      } catch (_) {
+        if (!mounted) return;
+        Navigator.of(context).pushReplacement(
+          PageRouteBuilder(
+            pageBuilder: (_, __, ___) => const LoginView(),
+            transitionsBuilder: (_, animation, __, child) =>
+                FadeTransition(opacity: animation, child: child),
+            transitionDuration: const Duration(milliseconds: 800),
+          ),
+        );
+      }
     });
   }
 
@@ -65,12 +106,10 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: Stack(
         children: [
-          // ── Cercles décoratifs ─────────────────────────────────────────
           Positioned(
             top: -60,
             right: -60,
@@ -79,7 +118,7 @@ class _SplashScreenState extends State<SplashScreen>
               height: 200,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _orange.withOpacity(0.08),
+                color: _orange.withValues(alpha: 0.08),
               ),
             ),
           ),
@@ -91,7 +130,7 @@ class _SplashScreenState extends State<SplashScreen>
               height: 80,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _orange.withOpacity(0.12),
+                color: _orange.withValues(alpha: 0.12),
               ),
             ),
           ),
@@ -103,7 +142,7 @@ class _SplashScreenState extends State<SplashScreen>
               height: 260,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _blue.withOpacity(0.07),
+                color: _blue.withValues(alpha: 0.07),
               ),
             ),
           ),
@@ -115,12 +154,10 @@ class _SplashScreenState extends State<SplashScreen>
               height: 50,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: _blue.withOpacity(0.1),
+                color: _blue.withValues(alpha: 0.1),
               ),
             ),
           ),
-
-          // ── Contenu principal ──────────────────────────────────────────
           Center(
             child: FadeTransition(
               opacity: _fadeAnim,
@@ -128,15 +165,11 @@ class _SplashScreenState extends State<SplashScreen>
                 animation: _ctrl,
                 builder: (_, child) => Transform.translate(
                   offset: Offset(0, _slideAnim.value),
-                  child: Transform.scale(
-                    scale: _scaleAnim.value,
-                    child: child,
-                  ),
+                  child: Transform.scale(scale: _scaleAnim.value, child: child),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // ── Logo ───────────────────────────────────────────
                     Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
@@ -144,13 +177,13 @@ class _SplashScreenState extends State<SplashScreen>
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: _orange.withOpacity(0.15),
+                            color: _orange.withValues(alpha: 0.15),
                             blurRadius: 40,
                             spreadRadius: 8,
                             offset: const Offset(0, 8),
                           ),
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
+                            color: Colors.black.withValues(alpha: 0.05),
                             blurRadius: 20,
                             offset: const Offset(0, 4),
                           ),
@@ -163,20 +196,9 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ),
                     const SizedBox(height: 28),
-
-                    // ── Nom de l'app ───────────────────────────────────
-                    const Text(
-                      'Citoyen +',
-                      style: TextStyle(
-                        fontSize: 32,
-                        fontWeight: FontWeight.w900,
-                        color: _orange,
-                        letterSpacing: -0.5,
-                      ),
-                    ),
                     const SizedBox(height: 8),
                     Text(
-                      'Ton espace citoyen en Côte d\'Ivoire 🇨🇮',
+                      "Ton espace citoyen en Côte d'Ivoire 🇨🇮",
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 14,
@@ -190,8 +212,6 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
           ),
-
-          // ── Bas de page ────────────────────────────────────────────────
           Positioned(
             bottom: 48,
             left: 0,
@@ -200,7 +220,6 @@ class _SplashScreenState extends State<SplashScreen>
               opacity: _fadeAnim,
               child: Column(
                 children: [
-                  // Indicateur de chargement
                   SizedBox(
                     width: 120,
                     child: ClipRRect(
@@ -219,7 +238,6 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-// ── Barre de chargement animée ────────────────────────────────────────────────
 class _AnimatedLoadingBar extends StatefulWidget {
   @override
   State<_AnimatedLoadingBar> createState() => _AnimatedLoadingBarState();
@@ -261,7 +279,7 @@ class _AnimatedLoadingBarState extends State<_AnimatedLoadingBar>
           widthFactor: _anim.value,
           child: Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFFF7F00),
+              color: const Color(0xFFE65C00),
               borderRadius: BorderRadius.circular(4),
             ),
           ),

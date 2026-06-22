@@ -1,55 +1,51 @@
-import 'dart:convert';
-import 'dart:io';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
+import 'package:image_picker/image_picker.dart';
+import '../core/network/dio_client.dart';
+import '../core/network/api_endpoints.dart';
 import '../models/post.dart';
 
 Future<PostModel> createArticle(
   String title,
-  String content,
-  String token, {
+  String content, {
   required DateTime date,
-  File? image,
+  required String excerpt,
+  XFile? image,
 }) async {
-  final uri = Uri.parse('https://admin.mec-ci.org/api/v1/actualites');
+  final dio = DioClient.getInstance();
+
+  PostModel parseResponse(dynamic responseData) {
+    final data = responseData;
+    final item = data is Map<String, dynamic> ? data['data'] ?? data : data;
+    return PostModel.fromJson(item as Map<String, dynamic>);
+  }
 
   if (image != null) {
-    final request = http.MultipartRequest('POST', uri)
-      ..headers['Authorization'] = 'Bearer $token'
-      ..fields['title'] = title
-      ..fields['content'] = content
-      ..fields['date'] = date.toIso8601String()
-      ..files.add(await http.MultipartFile.fromPath('imageUrl', image.path));
+    final formData = FormData.fromMap({
+      'title': title,
+      'content': content,
+      'excerpt': excerpt,
+      'date': date.toIso8601String(),
+      'imageUrl': await MultipartFile.fromFile(
+        image.path,
+        filename: image.name,
+      ),
+    });
 
-    final streamed = await request.send();
-    final response = await http.Response.fromStream(streamed);
-
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return PostModel.fromJson(
-          jsonDecode(response.body) as Map<String, dynamic>);
-    } else {
-      throw Exception(
-          'Échec publication. Status: ${response.statusCode}, Body: ${response.body}');
-    }
-  } else {
-    final response = await http.post(
-      uri,
-      headers: {
-        'Content-Type': 'application/json; charset=UTF-8',
-        'Authorization': 'Bearer $token',
-      },
-      body: jsonEncode({
-        'title': title,
-        'content': content,
-        'date': date.toIso8601String(),
-      }),
+    final response = await dio.post(
+      ApiEndpoints.actualites,
+      data: formData,
+      options: Options(contentType: 'multipart/form-data'),
     );
 
-    if (response.statusCode == 200 || response.statusCode == 201) {
-      return PostModel.fromJson(
-          jsonDecode(response.body) as Map<String, dynamic>);
-    } else {
-      throw Exception(
-          'Échec publication. Status: ${response.statusCode}, Body: ${response.body}');
-    }
+    return parseResponse(response.data);
   }
+
+  final response = await dio.post(ApiEndpoints.actualites, data: {
+    'title': title,
+    'content': content,
+    'excerpt': excerpt,
+    'date': date.toIso8601String(),
+  });
+
+  return parseResponse(response.data);
 }

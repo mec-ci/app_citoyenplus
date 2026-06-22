@@ -15,7 +15,7 @@ class MesActionsView extends StatefulWidget {
 class _MesActionsViewState extends State<MesActionsView> {
   late Future<List<SignalementModel>> _futureSignalements;
 
-  static const _orange = Color(0xFFFF7F00);
+  static const _orange = Color(0xFFE65C00);
   static const _blue = Color(0xFF1556B5);
 
   @override
@@ -26,9 +26,8 @@ class _MesActionsViewState extends State<MesActionsView> {
 
   Future<List<SignalementModel>> _loadMesSignalements() async {
     final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token') ?? '';
     final citoyenId = prefs.getString('citoyenId') ?? '';
-    return MesSignalementsService.fetchMesSignalements(token, citoyenId);
+    return MesSignalementsService.fetchMesSignalements(citoyenId);
   }
 
   @override
@@ -206,7 +205,7 @@ class _ActionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statut = signalement.statut ?? 'NOUVEAU';
+    final statut = signalement.statut;
     final couleur = _couleurStatut(statut);
     final icone = _iconeStatut(statut);
     final date = signalement.createdAt;
@@ -218,7 +217,7 @@ class _ActionCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -272,9 +271,9 @@ class _ActionCard extends StatelessWidget {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(
-                        color: couleur.withOpacity(0.12),
+                        color: couleur.withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: couleur.withOpacity(0.4)),
+                        border: Border.all(color: couleur.withValues(alpha: 0.4)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -294,8 +293,8 @@ class _ActionCard extends StatelessWidget {
                 const SizedBox(height: 6),
 
                 // ── Catégorie ────────────────────────────────────────
-                if (signalement.categorieNom != null &&
-                    signalement.categorieNom!.isNotEmpty)
+                if (signalement.categorie != null &&
+                    signalement.categorie!.nom.isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Row(
@@ -304,7 +303,7 @@ class _ActionCard extends StatelessWidget {
                             size: 12, color: Color(0xFF1556B5)),
                         const SizedBox(width: 4),
                         Text(
-                          signalement.categorieNom!,
+                          signalement.categorie!.nom,
                           style: const TextStyle(
                               fontSize: 11,
                               color: Color(0xFF1556B5),
@@ -357,7 +356,7 @@ class _ActionCard extends StatelessWidget {
     switch (s.toUpperCase()) {
       case 'NOUVEAU':   return const Color(0xFF1556B5);
       case 'EN_COURS':
-      case 'EN COURS':  return const Color(0xFFFF7F00);
+      case 'EN COURS':  return const Color(0xFFE65C00);
       case 'RÉSOLU':
       case 'RESOLU':    return const Color(0xFF34C759);
       case 'REJETÉ':

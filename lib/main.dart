@@ -1,31 +1,56 @@
+import 'package:citoyen_plus/core/network/error_handler.dart';
+import 'package:citoyen_plus/features/auth/presentation/providers/auth_provider.dart';
+import 'package:citoyen_plus/services/ai_chat_service.dart';
 import 'package:citoyen_plus/services/notification_service.dart';
+import 'package:citoyen_plus/ui/accueil.dart';
+import 'package:citoyen_plus/ui/login.dart';
+import 'package:citoyen_plus/ui/splash_view.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'ui/splash_view.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-
-Future<void> main() async {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService.init();
-  runApp(const MyApp());
+
+  await dotenv.load(fileName: 'assets/.env');
+  AiChatService.init();
+
+  try {
+    await Firebase.initializeApp()
+        .timeout(const Duration(seconds: 8));
+  } catch (e) {
+    debugPrint('Firebase init error: $e');
+  }
+
+  try {
+    await NotificationService.init()
+        .timeout(const Duration(seconds: 5));
+  } catch (e) {
+    debugPrint('Notification init error: $e');
+  }
+
+  runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
-      title: 'Flutter Demo',
+      title: 'citoyen+',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primaryColor: const Color(0xFFFF7F00), // Orange principal
-        colorScheme: ColorScheme.fromSwatch().copyWith(
-          primary: const Color(0xFFFF7F00),
-          secondary: const Color(0xFF1556B5), // Bleu secondaire
+        primaryColor: const Color(0xFFE65C00),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFE65C00),
+          primary: const Color(0xFFE65C00),
+          secondary: const Color(0xFF1556B5),
         ),
         scaffoldBackgroundColor: Colors.white,
         appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFFFF7F00),
+          backgroundColor: Color(0xFFE65C00),
           foregroundColor: Colors.white,
           elevation: 0,
           titleTextStyle: TextStyle(
@@ -44,21 +69,55 @@ class MyApp extends StatelessWidget {
           labelLarge: TextStyle(fontFamily: 'Metropolis'),
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          selectedItemColor: Color(0xFFFF7F00),
+          selectedItemColor: Color(0xFFE65C00),
           unselectedItemColor: Colors.grey,
           showUnselectedLabels: true,
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFF1556B5),
+            backgroundColor: const Color(0xFF1556B5),
             foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
+            shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.all(Radius.circular(12)),
             ),
           ),
         ),
       ),
-      home: SplashScreen(),
+      navigatorKey: HttpErrorHandler.navigatorKey,
+      home: const AuthGate(),
     );
+  }
+}
+
+class AuthGate extends ConsumerStatefulWidget {
+  const AuthGate({super.key});
+
+  @override
+  ConsumerState<AuthGate> createState() => _AuthGateState();
+}
+
+class _AuthGateState extends ConsumerState<AuthGate> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() async {
+      try {
+        await ref.read(authProvider.notifier).checkAuth()
+            .timeout(const Duration(seconds: 5));
+      } catch (_) {
+        ref.read(authProvider.notifier).logout();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authProvider);
+
+    return authState.isLoading
+        ? const SplashScreen()
+        : authState.status == AuthStatus.authenticated
+            ? const Home()
+            : const LoginView();
   }
 }

@@ -15,11 +15,10 @@ class CategorieSignalementModel {
 
   factory CategorieSignalementModel.fromJson(Map<String, dynamic> json) {
     return CategorieSignalementModel(
-      id: json['id'],
-      nom: json['nom'],
-      description: json['description'],
+      id: (json['id'] ?? '').toString(),
+      nom: json['nom']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
       validationObligatoire: json['validationObligatoire'] ?? false,
-      
     );
   }
 

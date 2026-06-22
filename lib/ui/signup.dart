@@ -1,7 +1,7 @@
+import 'package:citoyen_plus/features/auth/refresh_token_verification_view.dart';
 import 'package:flutter/material.dart';
 import 'login.dart';
 import 'package:citoyen_plus/services/auth_service.dart';
-
 
 const _blue = Color(0xFF1556B5);
 const _fillColor = Color(0xFFF8F9FF);
@@ -23,10 +23,14 @@ class _CreateAccountViewState extends State<CreateAccountView> {
   bool isLoading = false;
   bool hidePassword = true;
   bool hideConfirm = true;
+  String? errorMessage;
 
   Future<void> handleCreateAccount() async {
     if (!formKey.currentState!.validate()) return;
-    setState(() => isLoading = true);
+    setState(() {
+      isLoading = true;
+      errorMessage = null;
+    });
     final result = await AuthService.signup(
       name: fullnameCtrl.text.trim(),
       email: emailCtrl.text.trim(),
@@ -34,24 +38,38 @@ class _CreateAccountViewState extends State<CreateAccountView> {
       password: passwordCtrl.text.trim(),
     );
     if (!mounted) return;
-    setState(() => isLoading = false);
+    final message = result["message"]?.toString() ?? 'Une erreur est survenue';
+    setState(() {
+      isLoading = false;
+      if (!result["success"]) {
+        errorMessage = message;
+      }
+    });
+
     if (result["success"]) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text("✅ Compte créé avec succès !"),
           backgroundColor: const Color(0xFF34C759),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
-      Navigator.pop(context);
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const RefreshTokenVerificationView()),
+      );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(result["message"]),
+          content: Text(message),
           backgroundColor: const Color(0xFFFF2D55),
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
         ),
       );
     }
@@ -116,7 +134,11 @@ class _CreateAccountViewState extends State<CreateAccountView> {
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: Colors.grey.shade200),
                         ),
-                        child: const Icon(Icons.arrow_back_ios_new, size: 16, color: Colors.black87),
+                        child: const Icon(
+                          Icons.arrow_back_ios_new,
+                          size: 16,
+                          color: Colors.black87,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 14),
@@ -136,7 +158,11 @@ class _CreateAccountViewState extends State<CreateAccountView> {
                 // ── Sous-titre ─────────────────────────────────────────
                 Text(
                   'Rejoins la communauté Citoyen + 🇨🇮',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[500], height: 1.4),
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[500],
+                    height: 1.4,
+                  ),
                 ),
                 const SizedBox(height: 28),
 
@@ -144,8 +170,12 @@ class _CreateAccountViewState extends State<CreateAccountView> {
                 TextFormField(
                   controller: fullnameCtrl,
                   textCapitalization: TextCapitalization.words,
-                  decoration: _fieldDeco('Nom complet', Icons.person_outline_rounded),
-                  validator: (v) => v!.trim().isEmpty ? 'Nom et prénoms requis' : null,
+                  decoration: _fieldDeco(
+                    'Nom complet',
+                    Icons.person_outline_rounded,
+                  ),
+                  validator: (v) =>
+                      v!.trim().isEmpty ? 'Nom et prénoms requis' : null,
                 ),
                 const SizedBox(height: 14),
 
@@ -163,7 +193,9 @@ class _CreateAccountViewState extends State<CreateAccountView> {
                   controller: phoneCtrl,
                   keyboardType: TextInputType.phone,
                   decoration: _fieldDeco('Téléphone', Icons.phone_outlined),
-                  validator: (v) => v!.length < 10 ? 'Numéro invalide (min. 10 chiffres)' : null,
+                  validator: (v) => v!.length < 10
+                      ? 'Numéro invalide (min. 10 chiffres)'
+                      : null,
                 ),
                 const SizedBox(height: 14),
 
@@ -176,10 +208,14 @@ class _CreateAccountViewState extends State<CreateAccountView> {
                     Icons.lock_outline_rounded,
                     suffix: IconButton(
                       icon: Icon(
-                        hidePassword ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        color: Colors.grey, size: 20,
+                        hidePassword
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: Colors.grey,
+                        size: 20,
                       ),
-                      onPressed: () => setState(() => hidePassword = !hidePassword),
+                      onPressed: () =>
+                          setState(() => hidePassword = !hidePassword),
                     ),
                   ),
                   validator: (v) => v!.length < 6 ? 'Min. 6 caractères' : null,
@@ -195,15 +231,23 @@ class _CreateAccountViewState extends State<CreateAccountView> {
                     Icons.lock_outline_rounded,
                     suffix: IconButton(
                       icon: Icon(
-                        hideConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined,
-                        color: Colors.grey, size: 20,
+                        hideConfirm
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
+                        color: Colors.grey,
+                        size: 20,
                       ),
-                      onPressed: () => setState(() => hideConfirm = !hideConfirm),
+                      onPressed: () =>
+                          setState(() => hideConfirm = !hideConfirm),
                     ),
                   ),
                   validator: (v) {
-                    if (v!.length < 6) return 'Min. 6 caractères';
-                    if (v != passwordCtrl.text) return 'Les mots de passe ne correspondent pas';
+                    if (v!.length < 6) {
+                      return 'Min. 6 caractères';
+                    }
+                    if (v != passwordCtrl.text) {
+                      return 'Les mots de passe ne correspondent pas';
+                    }
                     return null;
                   },
                 ),
@@ -218,29 +262,83 @@ class _CreateAccountViewState extends State<CreateAccountView> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _blue,
                       disabledBackgroundColor: Colors.grey[300],
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                       elevation: 0,
                     ),
                     child: isLoading
-                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
                         : const Text(
                             'Créer mon compte',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                            ),
                           ),
                   ),
                 ),
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFE5E9),
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.error_outline,
+                          color: Color(0xFFFF2D55),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            errorMessage!,
+                            style: const TextStyle(
+                              color: Color(0xFFB00020),
+                              fontSize: 14,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 24),
 
                 // ── Lien connexion ─────────────────────────────────────
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text("Déjà un compte ? ", style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                    Text(
+                      "Déjà un compte ? ",
+                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                    ),
                     GestureDetector(
-                      onTap: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginView())),
+                      onTap: () => Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (_) => const LoginView()),
+                      ),
                       child: const Text(
                         'Se connecter',
-                        style: TextStyle(color: _blue, fontWeight: FontWeight.w800, fontSize: 14),
+                        style: TextStyle(
+                          color: _blue,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                        ),
                       ),
                     ),
                   ],

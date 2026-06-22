@@ -3,10 +3,11 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../config/api_config.dart';
 
 Future<Album> createAlbum(String nom, String description) async {
   final response = await http.post(
-    Uri.parse('https://admin.mec-ci.org/api/v1/categorie-signalement'),
+    Uri.parse('${ApiConfig.baseUrl}/categorie-signalement'),
     headers: <String, String>{
       'Content-Type': 'application/json; charset=UTF-8',
     },

@@ -37,7 +37,7 @@ class _SignalementCardState extends State<SignalementCard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),
@@ -168,7 +168,7 @@ class _SignalementCardState extends State<SignalementCard> {
     switch (statut.toUpperCase()) {
       case 'NOUVEAU':     return const Color(0xFF1556B5);
       case 'EN_COURS':
-      case 'EN COURS':   return const Color(0xFFFF7F00);
+      case 'EN COURS':   return const Color(0xFFE65C00);
       case 'RÉSOLU':
       case 'RESOLU':     return const Color(0xFF34C759);
       case 'REJETÉ':
@@ -210,9 +210,9 @@ class _Badge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: couleur.withOpacity(0.12),
+        color: couleur.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
-        border: withBorder ? Border.all(color: couleur.withOpacity(0.4)) : null,
+        border: withBorder ? Border.all(color: couleur.withValues(alpha: 0.4)) : null,
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -271,7 +271,7 @@ class _ShimmerBoxState extends State<_ShimmerBox>
       builder: (_, __) => Container(
         height: widget.height,
         decoration: BoxDecoration(
-          color: Colors.grey[300]!.withOpacity(_anim.value),
+          color: Colors.grey[300]!.withValues(alpha: _anim.value),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         ),
       ),
