@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/api_service.dart';
 import 'detail_page.dart';
 import 'regions_page.dart';
-import 'livre_pdf_view.dart';
+import 'document_detail_view.dart';
 import 'entete.dart';
 
 class LibrairieView extends StatefulWidget {
@@ -33,13 +33,27 @@ class _LibrairieViewState extends State<LibrairieView>
   bool _isLoadingDocuments = true;
   String? _documentsError;
 
+  List<String> _categories = [];
+  String? _selectedCategorie;
+
   @override
   void initState() {
     super.initState();
     filteredDocuments = [];
-    searchCtrl.addListener(() => filterDocuments(searchCtrl.text));
+    searchCtrl.addListener(() => _applyFilters());
     _tabController = TabController(length: 2, vsync: this);
     _loadDocuments();
+    _loadCategories();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final cats = await ApiService.fetchLibraryCategories();
+      if (!mounted) return;
+      setState(() => _categories = cats);
+    } catch (_) {
+      // Filtres par catégorie simplement indisponibles en cas d'échec.
+    }
   }
 
   @override
@@ -59,9 +73,9 @@ class _LibrairieViewState extends State<LibrairieView>
       if (!mounted) return;
       setState(() {
         documents = docs;
-        filteredDocuments = List<Map<String, dynamic>>.from(docs);
         _isLoadingDocuments = false;
       });
+      _applyFilters();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -71,20 +85,21 @@ class _LibrairieViewState extends State<LibrairieView>
     }
   }
 
-  void filterDocuments(String query) {
-    final q = query.trim().toLowerCase();
+  /// Filtre les documents par texte (titre/description) ET catégorie courante.
+  void _applyFilters() {
+    final q = searchCtrl.text.trim().toLowerCase();
     setState(() {
-      filteredDocuments = q.isEmpty
-          ? List<Map<String, dynamic>>.from(documents)
-          : documents.where((doc) {
-              final title = (doc['titre'] ?? doc['title'] ?? '')
-                  .toString()
-                  .toLowerCase();
-              final description = (doc['description'] ?? '')
-                  .toString()
-                  .toLowerCase();
-              return title.contains(q) || description.contains(q);
-            }).toList();
+      filteredDocuments = documents.where((doc) {
+        final matchesCategorie = _selectedCategorie == null ||
+            (doc['categorie'] ?? '').toString() == _selectedCategorie;
+        if (!matchesCategorie) return false;
+        if (q.isEmpty) return true;
+        final title =
+            (doc['titre'] ?? doc['title'] ?? '').toString().toLowerCase();
+        final description =
+            (doc['description'] ?? '').toString().toLowerCase();
+        return title.contains(q) || description.contains(q);
+      }).toList();
     });
   }
 
@@ -157,7 +172,7 @@ class _LibrairieViewState extends State<LibrairieView>
                           GestureDetector(
                             onTap: () {
                               searchCtrl.clear();
-                              filterDocuments('');
+                              _applyFilters();
                             },
                             child: Icon(
                               Icons.close,
@@ -233,22 +248,69 @@ class _LibrairieViewState extends State<LibrairieView>
   }
 
   Widget _buildBibliotheque() {
-    if (filteredDocuments.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.search_off, size: 48, color: Colors.grey[300]),
-            const SizedBox(height: 12),
-            Text(
-              "Aucun document trouvé",
-              style: TextStyle(color: Colors.grey[400], fontSize: 15),
-            ),
-          ],
+    return Column(
+      children: [
+        _buildCategorieChips(),
+        Expanded(
+          child: filteredDocuments.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.search_off, size: 48, color: Colors.grey[300]),
+                      const SizedBox(height: 12),
+                      Text(
+                        "Aucun document trouvé",
+                        style: TextStyle(color: Colors.grey[400], fontSize: 15),
+                      ),
+                    ],
+                  ),
+                )
+              : _buildGrid(),
         ),
-      );
-    }
+      ],
+    );
+  }
 
+  Widget _buildCategorieChips() {
+    if (_categories.isEmpty) return const SizedBox.shrink();
+    final items = <String?>[null, ..._categories];
+    return SizedBox(
+      height: 44,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+        itemCount: items.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, i) {
+          final cat = items[i];
+          final selected = _selectedCategorie == cat;
+          return ChoiceChip(
+            label: Text(cat ?? 'Tout'),
+            selected: selected,
+            showCheckmark: false,
+            selectedColor: _orange,
+            labelStyle: TextStyle(
+              color: selected ? Colors.white : Colors.black87,
+              fontWeight: FontWeight.w600,
+              fontSize: 13,
+            ),
+            backgroundColor: Colors.grey[100],
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
+              side: BorderSide(color: Colors.grey.shade200),
+            ),
+            onSelected: (_) {
+              setState(() => _selectedCategorie = cat);
+              _applyFilters();
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildGrid() {
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -262,26 +324,17 @@ class _LibrairieViewState extends State<LibrairieView>
         final doc = filteredDocuments[i];
         final title = doc['titre'] ?? doc['title'] ?? 'Document';
         final description = doc['description'] ?? '';
-        final imageUrl = doc['couverture'] ?? doc['image'] ?? '';
-        final rawUrl = doc['pdf'] ?? doc['url'] ?? doc['documentUrl'] ?? '';
+        final imageUrl =
+            doc['couverture'] ?? doc['coverImage'] ?? doc['image'] ?? '';
 
         return GestureDetector(
           onTap: () {
-            if (rawUrl.toString().isNotEmpty) {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => LivrePdfView(
-                    pdf: rawUrl.toString(),
-                    title: title.toString(),
-                  ),
-                ),
-              );
-            } else {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Document introuvable')),
-              );
-            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => DocumentDetailView(doc: doc),
+              ),
+            );
           },
           child: Container(
             decoration: BoxDecoration(

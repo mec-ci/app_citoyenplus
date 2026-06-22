@@ -115,10 +115,12 @@ class ApiService {
   }
 
   static Future<List<Map<String, dynamic>>> fetchLibraryDocuments(
-    String? title,
-  ) async {
+    String? title, {
+    String? categorie,
+  }) async {
     final query = <String, dynamic>{};
     if (title != null) query['title'] = title;
+    if (categorie != null) query['categorie'] = categorie;
 
     final response = await _dio.get(
       ApiEndpoints.librairiePublic,
@@ -129,6 +131,15 @@ class ApiService {
     return (docs as List)
         .map((item) => item as Map<String, dynamic>)
         .toList();
+  }
+
+  /// Récupère la liste des catégories de documents de la librairie.
+  static Future<List<String>> fetchLibraryCategories() async {
+    final response = await _dio.get(ApiEndpoints.librairieCategories);
+    final data = response.data;
+    final list = data is Map<String, dynamic> ? data['data'] ?? data : data;
+    if (list is! List) return const [];
+    return list.map((e) => e.toString()).where((e) => e.isNotEmpty).toList();
   }
 
   /// Charge les catégories de quiz depuis l'API (`GET /quizz/categories`).
