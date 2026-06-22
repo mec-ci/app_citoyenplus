@@ -1,4 +1,3 @@
-import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:citoyen_plus/models/categorie_signalement_model.dart';
 import 'package:citoyen_plus/services/recuperer_categorie_signalement_service.dart';
@@ -39,16 +38,14 @@ class CategorieSignalementNotifier
         categories: categories,
         isLoading: false,
       );
-    } on DioException {
-      state = CategorieSignalementState(
-        categories: _mockFallbackCategories,
+    } catch (_) {
+      // Aucun repli local : proposer de fausses catégories enverrait un
+      // identifiant inexistant au serveur (signalement rejeté). On expose
+      // plutôt une erreur pour permettre une nouvelle tentative.
+      state = const CategorieSignalementState(
+        categories: [],
         isLoading: false,
-      );
-    } catch (e) {
-      state = CategorieSignalementState(
-        categories: state.categories,
-        isLoading: false,
-        error: 'Impossible de charger les categories.',
+        error: 'Impossible de charger les catégories. Réessayez.',
       );
     }
   }
@@ -59,36 +56,3 @@ final categorieSignalementProvider =
         CategorieSignalementState>((ref) {
   return CategorieSignalementNotifier();
 });
-
-List<CategorieSignalementModel> get _mockFallbackCategories => [
-  CategorieSignalementModel(
-    id: 'fb_cat_1',
-    nom: 'Voirie',
-    description: 'Problèmes de voirie',
-    validationObligatoire: false,
-  ),
-  CategorieSignalementModel(
-    id: 'fb_cat_2',
-    nom: 'Éclairage public',
-    description: 'Pannes d\'éclairage',
-    validationObligatoire: false,
-  ),
-  CategorieSignalementModel(
-    id: 'fb_cat_3',
-    nom: 'Eau et assainissement',
-    description: 'Problèmes d\'eau',
-    validationObligatoire: false,
-  ),
-  CategorieSignalementModel(
-    id: 'fb_cat_4',
-    nom: 'Déchets',
-    description: 'Collecte des déchets',
-    validationObligatoire: false,
-  ),
-  CategorieSignalementModel(
-    id: 'fb_cat_5',
-    nom: 'Sécurité',
-    description: 'Sécurité publique',
-    validationObligatoire: false,
-  ),
-];
