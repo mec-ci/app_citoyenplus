@@ -44,7 +44,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     _ctrl.forward();
 
-    Future.delayed(const Duration(seconds: 2), () async {
+    Future.delayed(const Duration(seconds: 3), () async {
       if (!mounted) return;
       try {
         final authenticated = await AuthService.isAuthenticated();
