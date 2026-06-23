@@ -4,6 +4,7 @@ import 'package:citoyen_plus/features/feed/presentation/pages/actualite_detail_v
 import 'package:citoyen_plus/services/commentaire_service.dart';
 import 'package:citoyen_plus/services/reaction_service.dart';
 import 'package:citoyen_plus/widgets/commentaires_sheet.dart';
+import 'package:citoyen_plus/widgets/simple_html_view.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -70,7 +71,8 @@ class _FeedActualiteCardState extends State<FeedActualiteCard> {
   }
 
   void _share() {
-    Share.share('${widget.item.titre}\n${widget.item.description}');
+    Share.share(
+        '${widget.item.titre}\n${htmlToPlainText(widget.item.description)}');
   }
 
   @override
@@ -172,7 +174,7 @@ class _FeedActualiteCardState extends State<FeedActualiteCard> {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      widget.item.description,
+                      htmlToPlainText(widget.item.description),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(fontSize: 11, color: Colors.grey[600]),

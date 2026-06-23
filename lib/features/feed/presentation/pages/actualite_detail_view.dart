@@ -5,6 +5,7 @@ import 'package:citoyen_plus/services/api_service.dart';
 import 'package:citoyen_plus/services/commentaire_service.dart';
 import 'package:citoyen_plus/services/reaction_service.dart';
 import 'package:citoyen_plus/widgets/commentaires_sheet.dart';
+import 'package:citoyen_plus/widgets/simple_html_view.dart';
 import 'package:flutter/material.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -127,10 +128,11 @@ class _ActualiteDetailViewState extends State<ActualiteDetailView> {
   }
 
   void _share() {
-    final body = _post?.content.isNotEmpty == true
+    final raw = _post?.content.isNotEmpty == true
         ? _post!.content
         : widget.item.description;
-    Share.share('${widget.item.titre}\n\n$body');
+    // Le contenu est au format HTML : on partage une version texte lisible.
+    Share.share('${widget.item.titre}\n\n${htmlToPlainText(raw)}');
   }
 
   @override
@@ -259,10 +261,9 @@ class _ActualiteDetailViewState extends State<ActualiteDetailView> {
 
     final content = _post?.content;
     if (content != null && content.isNotEmpty) {
-      return Text(
-        content,
-        style: const TextStyle(fontSize: 15, height: 1.6, color: Colors.black87),
-      );
+      // Le contenu est du HTML (éditeur riche) : on le formate au lieu de
+      // l'afficher en dur.
+      return SimpleHtmlView(html: content);
     }
 
     // Repli : si le contenu complet n'a pas pu être chargé, on affiche au moins
@@ -270,11 +271,7 @@ class _ActualiteDetailViewState extends State<ActualiteDetailView> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          widget.item.description,
-          style: const TextStyle(
-              fontSize: 15, height: 1.6, color: Colors.black87),
-        ),
+        SimpleHtmlView(html: widget.item.description),
         if (_error != null) ...[
           const SizedBox(height: 16),
           Row(
