@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/mes_signalements_service.dart';
 
@@ -32,14 +31,11 @@ class _NotificationViewState extends State<NotificationView> {
   }
 
   /// L'« Activité » du citoyen correspond à ses signalements (mêmes données que
-  /// la page « Mes actions »). Endpoint : GET /signalement-citoyen?citoyenId=…
-  /// Il n'existe pas d'endpoint GET /notifications côté backend.
+  /// la page « Mes actions »). Endpoint : GET /signalement-citoyen/me
+  /// (citoyen déduit du JWT). Il n'existe pas d'endpoint GET /notifications
+  /// côté backend.
   Future<List<Map<String, dynamic>>> _loadActivites() async {
-    final prefs = await SharedPreferences.getInstance();
-    final citoyenId = prefs.getString('citoyenId') ?? '';
-    if (citoyenId.isEmpty) return [];
-    final signalements =
-        await MesSignalementsService.fetchMesSignalements(citoyenId);
+    final signalements = await MesSignalementsService.fetchMesSignalements();
     return signalements
         .map((s) => <String, dynamic>{
               'title': s.titre,

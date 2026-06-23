@@ -4,6 +4,7 @@ import 'login.dart';
 import 'settings_view.dart';
 import '../services/auth_service.dart';
 import '../services/user_service.dart';
+import '../services/mes_signalements_service.dart';
 import '../services/api_service.dart';
 import '../models/signalement.dart';
 import '../providers/gamification_provider.dart';
@@ -74,8 +75,18 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
   }
 
   Future<void> _loadStats() async {
+    // Identifiant de l'utilisateur dont on affiche le profil : soit le profil
+    // consulté (widget.userId), soit l'utilisateur connecté.
+    final userId = widget.userId ?? await UserService.currentUserId();
+    // Charge uniquement les signalements de cet utilisateur. Pour son propre
+    // profil, on utilise la route dédiée `/signalement-citoyen/me` (citoyen
+    // déduit du JWT) ; pour le profil public d'un autre citoyen, on filtre par
+    // son identifiant. Sans cela, l'API renvoyait tous les signalements et le
+    // compteur était erroné (ceux des autres) sur un compte vierge.
     try {
-      final signalements = await ApiService.fetchSignalements();
+      final signalements = widget.userId == null
+          ? await MesSignalementsService.fetchMesSignalements()
+          : await UserService.fetchUserSignalements(widget.userId!);
       if (!mounted) return;
       setState(() {
         signalementCount = signalements.length;
@@ -84,7 +95,6 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
     } catch (_) {}
     // Charge le nombre de quiz complétés depuis le serveur.
     try {
-      final userId = widget.userId ?? await UserService.currentUserId();
       if (userId != null) {
         final results = await ApiService.fetchQuizResults(userId);
         if (!mounted) return;

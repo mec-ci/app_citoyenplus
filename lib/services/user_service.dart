@@ -57,6 +57,10 @@ class UserService {
         .toList();
   }
 
+  /// Récupère les signalements d'un AUTRE citoyen (consultation de son profil
+  /// public), filtrés par son identifiant. Pour l'utilisateur connecté, on
+  /// préfère la route dédiée `GET /signalement-citoyen/me`
+  /// (cf. [MesSignalementsService.fetchMesSignalements]).
   static Future<List<SignalementModel>> fetchUserSignalements(String userId) async {
     final response = await _dio.get(
       ApiEndpoints.signalementCitoyen,

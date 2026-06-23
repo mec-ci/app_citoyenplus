@@ -1,6 +1,5 @@
 import 'package:citoyen_plus/services/mes_signalements_service.dart';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/signalement.dart';
 
 class MesActionsView extends StatefulWidget {
@@ -25,9 +24,7 @@ class _MesActionsViewState extends State<MesActionsView> {
   }
 
   Future<List<SignalementModel>> _loadMesSignalements() async {
-    final prefs = await SharedPreferences.getInstance();
-    final citoyenId = prefs.getString('citoyenId') ?? '';
-    return MesSignalementsService.fetchMesSignalements(citoyenId);
+    return MesSignalementsService.fetchMesSignalements();
   }
 
   @override
