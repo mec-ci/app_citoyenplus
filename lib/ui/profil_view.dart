@@ -74,8 +74,16 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
   }
 
   Future<void> _loadStats() async {
+    // Identifiant de l'utilisateur dont on affiche le profil : soit le profil
+    // consulté (widget.userId), soit l'utilisateur connecté.
+    final userId = widget.userId ?? await UserService.currentUserId();
+    // Charge uniquement les signalements de cet utilisateur. Sans filtre par
+    // `citoyenId`, l'API renvoie les signalements de tous les citoyens, ce qui
+    // affichait un nombre erroné (ceux des autres) sur un compte vierge.
     try {
-      final signalements = await ApiService.fetchSignalements();
+      final signalements = userId != null
+          ? await UserService.fetchUserSignalements(userId)
+          : <SignalementModel>[];
       if (!mounted) return;
       setState(() {
         signalementCount = signalements.length;
@@ -84,7 +92,6 @@ class _ProfilViewState extends ConsumerState<ProfilView> {
     } catch (_) {}
     // Charge le nombre de quiz complétés depuis le serveur.
     try {
-      final userId = widget.userId ?? await UserService.currentUserId();
       if (userId != null) {
         final results = await ApiService.fetchQuizResults(userId);
         if (!mounted) return;
