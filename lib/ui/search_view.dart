@@ -8,6 +8,7 @@ import 'package:citoyen_plus/widgets/publication_card.dart';
 import 'package:citoyen_plus/widgets/commentaires_sheet.dart';
 import 'package:citoyen_plus/services/commentaire_service.dart';
 import 'package:citoyen_plus/services/reaction_service.dart';
+import 'package:citoyen_plus/widgets/simple_html_view.dart';
 import 'detail_page.dart';
 import 'livre_pdf_view.dart';
 import 'quiz_view.dart';
@@ -296,12 +297,17 @@ class _SearchViewState extends State<SearchView> {
               child: const Icon(Icons.article, color: Colors.grey),
             ),
       title: Text(post.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-      subtitle: Text(post.excerpt, maxLines: 1, overflow: TextOverflow.ellipsis),
+      subtitle: Text(htmlToPlainText(post.excerpt),
+          maxLines: 1, overflow: TextOverflow.ellipsis),
       trailing: const Icon(Icons.chevron_right_rounded),
       onTap: () {
+        // Le contenu des actualités est du HTML : on le convertit en texte
+        // lisible pour la page de détail générique.
         final details = post.content.isNotEmpty
-            ? post.content
-            : (post.excerpt.isNotEmpty ? post.excerpt : post.title);
+            ? htmlToPlainText(post.content)
+            : (post.excerpt.isNotEmpty
+                ? htmlToPlainText(post.excerpt)
+                : post.title);
         Navigator.push(
           context,
           MaterialPageRoute(

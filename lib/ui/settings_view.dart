@@ -90,7 +90,9 @@ class _SettingsViewState extends State<SettingsView> {
         fullnameCtrl.text = data['fullname'] ?? data['name'] ?? '';
         emailCtrl.text = data['email'] ?? '';
         phoneCtrl.text = data['phone'] ?? '';
-        _avatarUrl = data['avatarUrl'] ?? data['avatar'] ?? ''; 
+        _avatarUrl =
+            UserService.absoluteMediaUrl(data['avatarUrl'] ?? data['avatar']) ??
+                '';
         _isLoading = false;
       });
     } catch (e) {

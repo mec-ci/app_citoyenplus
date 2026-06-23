@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../services/api_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
+import '../services/mes_signalements_service.dart';
 
 class NotificationView extends StatefulWidget {
   final VoidCallback? onMesActionsPressed;
@@ -25,10 +26,28 @@ class _NotificationViewState extends State<NotificationView> {
     final token = await AuthService.getToken();
     if (!mounted) return;
     setState(() {
-      _futureNotifications = token == null
-          ? Future.value([])
-          : ApiService.fetchNotifications();
+      _futureNotifications =
+          token == null ? Future.value([]) : _loadActivites();
     });
+  }
+
+  /// L'« Activité » du citoyen correspond à ses signalements (mêmes données que
+  /// la page « Mes actions »). Endpoint : GET /signalement-citoyen?citoyenId=…
+  /// Il n'existe pas d'endpoint GET /notifications côté backend.
+  Future<List<Map<String, dynamic>>> _loadActivites() async {
+    final prefs = await SharedPreferences.getInstance();
+    final citoyenId = prefs.getString('citoyenId') ?? '';
+    if (citoyenId.isEmpty) return [];
+    final signalements =
+        await MesSignalementsService.fetchMesSignalements(citoyenId);
+    return signalements
+        .map((s) => <String, dynamic>{
+              'title': s.titre,
+              'message': s.description,
+              'status': s.statut,
+              'createdAt': s.createdAt?.toIso8601String(),
+            })
+        .toList();
   }
 
   List<Map<String, dynamic>> _filtered(List<Map<String, dynamic>> all) {

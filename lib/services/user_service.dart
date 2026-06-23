@@ -8,6 +8,17 @@ import '../models/signalement.dart';
 class UserService {
   static final Dio _dio = DioClient.getInstance();
 
+  /// Construit une URL absolue à partir d'un chemin renvoyé par l'API.
+  /// Le backend stocke les médias (avatars, photos) sous forme de chemin
+  /// relatif (ex: `uploads/users-avatar/xxx.jpg`). On le préfixe par l'hôte de
+  /// l'API, comme c'est déjà le cas pour les photos de signalement.
+  static String? absoluteMediaUrl(String? path) {
+    if (path == null || path.isEmpty) return null;
+    if (path.startsWith('http')) return path;
+    final clean = path.startsWith('/') ? path : '/$path';
+    return '${ApiEndpoints.apiBaseUrl}$clean';
+  }
+
   static Future<Map<String, dynamic>> fetchProfile() async {
     final response = await _dio.get(ApiEndpoints.usersDetail);
     return response.data as Map<String, dynamic>;
@@ -94,7 +105,8 @@ class UserService {
 
     if (response.statusCode == 200 || response.statusCode == 201) {
       final data = response.data as Map<String, dynamic>;
-      return (data['avatar'] ?? data['avatarUrl']) as String?;
+      final raw = (data['avatar'] ?? data['avatarUrl']) as String?;
+      return absoluteMediaUrl(raw);
     }
     return null;
   }
