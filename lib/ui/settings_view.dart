@@ -165,6 +165,23 @@ class _SettingsViewState extends State<SettingsView> {
         const SnackBar(content: Text('Complète tous les champs du mot de passe')),      );
       return;
     }
+    // Le backend impose : au moins 8 caractères, une majuscule, un chiffre et
+    // un caractère spécial. On valide côté client pour éviter un 400 opaque.
+    final newPassword = newPasswordCtrl.text.trim();
+    final passwordRegex = RegExp(
+      r'^(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()_+\-=\[\]{}|;:,.<>?/\\' "'" r'"])'
+      r'[A-Za-z\d!@#$%^&*()_+\-=\[\]{}|;:,.<>?/\\' "'" r'"]{8,}$',
+    );
+    if (!passwordRegex.hasMatch(newPassword)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Le mot de passe doit contenir au moins 8 caractères, une majuscule, un chiffre et un caractère spécial.',
+          ),
+        ),
+      );
+      return;
+    }
 
     setState(() => _isChangingPassword = true);
     try {

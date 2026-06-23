@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:image_picker/image_picker.dart';
 import '../core/network/dio_client.dart';
 import '../core/network/api_endpoints.dart';
+import '../core/network/error_handler.dart';
 import '../models/post.dart';
 import '../models/signalement.dart';
 
@@ -113,15 +114,21 @@ class UserService {
 
   /// Change le mot de passe via PATCH /users/password.
   /// Le backend attend `oldPassword`, `password` et `confirmPassword`.
+  /// En cas d'erreur HTTP (ex. 400), le message renvoyé par le serveur est
+  /// propagé via une [Exception] afin que l'écran puisse l'afficher.
   static Future<bool> changePassword({
     required String oldPassword,
     required String newPassword,
   }) async {
-    final response = await _dio.patch(ApiEndpoints.usersPassword, data: {
-      'oldPassword': oldPassword,
-      'password': newPassword,
-      'confirmPassword': newPassword,
-    });
-    return response.statusCode == 200 || response.statusCode == 201;
+    try {
+      final response = await _dio.patch(ApiEndpoints.usersPassword, data: {
+        'oldPassword': oldPassword,
+        'password': newPassword,
+        'confirmPassword': newPassword,
+      });
+      return response.statusCode == 200 || response.statusCode == 201;
+    } on DioException catch (e) {
+      throw Exception(HttpErrorHandler.extractErrorMessage(e));
+    }
   }
 }
