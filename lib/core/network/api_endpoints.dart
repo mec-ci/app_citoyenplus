@@ -10,6 +10,9 @@ class ApiEndpoints {
   static const String resetPassword = '/auth/reset-password';
 
   static const String signalementCitoyen = '/signalement-citoyen';
+  // Signalements d'un citoyen donné (route dédiée côté backend).
+  static String signalementCitoyenByUser(String citoyenId) =>
+      '/signalement-citoyen/utilisateur/$citoyenId';
   static const String categorieSignalement = '/categorie-signalement';
 
   static const String actualites = '/actualites';

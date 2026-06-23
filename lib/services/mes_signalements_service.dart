@@ -9,8 +9,7 @@ class MesSignalementsService {
   static Future<List<SignalementModel>> fetchMesSignalements(
       String citoyenId) async {
     final response = await _dio.get(
-      ApiEndpoints.signalementCitoyen,
-      queryParameters: {'citoyenId': citoyenId},
+      ApiEndpoints.signalementCitoyenByUser(citoyenId),
     );
 
     final data = response.data;
