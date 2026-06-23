@@ -154,14 +154,20 @@ class HomeState extends State<Home> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: IndexedStack(index: selectedIndex, children: pages),
-      bottomNavigationBar: Container(
-        height: 60,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: Color(0xFFE0E0E0), width: 0.5)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        // Évite que la barre de navigation passe derrière la barre système
+        // Android (gestes/boutons), notamment sur Samsung.
+        child: Container(
+          height: 60,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(
+              top: BorderSide(color: Color(0xFFE0E0E0), width: 0.5),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
             _NavItem(
               icon: Icons.home_outlined,
@@ -214,6 +220,7 @@ class HomeState extends State<Home> {
               onTap: () => onItemTapped(3),
             ),
           ],
+          ),
         ),
       ),
     );
