@@ -29,10 +29,10 @@ class _OnboardingViewState extends State<OnboardingView> {
       icon: Icons.emoji_events,
     ),
     _OnboardingPageData(
-      title: 'Infos et documentation',
+      title: 'Infos et Agent IA',
       description:
-          'Consultez la documentation et les infos sur le droit et les institutions ivoiriennes, le tout disponible en un seul endroit.',
-      icon: Icons.menu_book_outlined,
+          'Bénéficiez d’un chatbot IA spécialisé en droit et institutions ivoiriennes, et consultez la documentation et les infos disponibles en un seul endroit.',
+      icon: Icons.chat_bubble_outline,
     ),
   ];
 
