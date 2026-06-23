@@ -57,12 +57,14 @@ class UserService {
         .toList();
   }
 
-  /// Récupère les signalements d'un citoyen donné via la route dédiée
-  /// `GET /signalement-citoyen/utilisateur/:citoyenId`, qui ne renvoie que les
-  /// signalements de cet utilisateur (et non l'ensemble du flux public).
+  /// Récupère les signalements d'un AUTRE citoyen (consultation de son profil
+  /// public), filtrés par son identifiant. Pour l'utilisateur connecté, on
+  /// préfère la route dédiée `GET /signalement-citoyen/me`
+  /// (cf. [MesSignalementsService.fetchMesSignalements]).
   static Future<List<SignalementModel>> fetchUserSignalements(String userId) async {
     final response = await _dio.get(
-      ApiEndpoints.signalementCitoyenByUser(userId),
+      ApiEndpoints.signalementCitoyen,
+      queryParameters: {'citoyenId': userId},
     );
     final data = response.data;
     final items = data is Map<String, dynamic> ? data['data'] ?? data : data;

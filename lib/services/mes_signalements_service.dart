@@ -6,10 +6,12 @@ import 'package:citoyen_plus/core/network/api_endpoints.dart';
 class MesSignalementsService {
   static final Dio _dio = DioClient.getInstance();
 
-  static Future<List<SignalementModel>> fetchMesSignalements(
-      String citoyenId) async {
+  /// Récupère les signalements de l'utilisateur connecté via la route dédiée
+  /// `GET /signalement-citoyen/me` : le backend déduit le citoyen du JWT, aucun
+  /// identifiant n'est donc nécessaire côté client.
+  static Future<List<SignalementModel>> fetchMesSignalements() async {
     final response = await _dio.get(
-      ApiEndpoints.signalementCitoyenByUser(citoyenId),
+      ApiEndpoints.signalementCitoyenMe,
     );
 
     final data = response.data;
