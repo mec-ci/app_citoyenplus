@@ -271,7 +271,7 @@ class _CreateSignalementPageState extends ConsumerState<CreateSignalementPage> {
     if (success) {
       _showSnack('Signalement soumis avec succes.');
       Navigator.of(context).pop(true);
-      ref.read(signalementProvider.notifier).fetchSignalements();
+      ref.read(signalementProvider.notifier).refresh();
     } else {
       _showSnack(
         ref.read(signalementProvider).error ??

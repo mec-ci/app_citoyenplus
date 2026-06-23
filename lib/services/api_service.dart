@@ -158,8 +158,10 @@ class ApiService {
       query['radiusKm'] = radiusKm;
     }
 
+    // Flux mobile : seuls les signalements validés (validation = true) sont
+    // retournés par le backend.
     final response = await _dio.get(
-      ApiEndpoints.signalementCitoyen,
+      ApiEndpoints.signalementCitoyenMobile,
       queryParameters: query,
     );
     final data = response.data;

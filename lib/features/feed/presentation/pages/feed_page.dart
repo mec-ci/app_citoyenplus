@@ -43,6 +43,7 @@ class FeedPage extends ConsumerStatefulWidget {
 class _FeedPageState extends ConsumerState<FeedPage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  final ScrollController _signalementScrollController = ScrollController();
   final List<String> _tabs = const ['Tous', 'Signalements', 'Actualites'];
 
   @override
@@ -54,15 +55,26 @@ class _FeedPageState extends ConsumerState<FeedPage>
         ref.read(feedTabProvider.notifier).select(_tabController.index);
       }
     });
+    // Défilement infini de l'onglet « Signalements » : charge la page suivante
+    // lorsqu'on approche du bas de la liste.
+    _signalementScrollController.addListener(_onSignalementScroll);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(signalementProvider.notifier).fetchSignalements();
+      ref.read(signalementProvider.notifier).fetchSignalements(page: 1);
       ref.read(feedProvider.notifier).fetchAll();
     });
   }
 
+  void _onSignalementScroll() {
+    final position = _signalementScrollController.position;
+    if (position.pixels >= position.maxScrollExtent - 300) {
+      ref.read(signalementProvider.notifier).loadNextPage();
+    }
+  }
+
   @override
   void dispose() {
+    _signalementScrollController.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -210,7 +222,7 @@ class _FeedPageState extends ConsumerState<FeedPage>
   }
 
   Widget _buildSignalementTab(SignalementState state) {
-    if (state.isLoading) {
+    if (state.isLoading && state.items.isEmpty) {
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: ListView.separated(
@@ -221,7 +233,7 @@ class _FeedPageState extends ConsumerState<FeedPage>
       );
     }
 
-    if (state.error != null) {
+    if (state.error != null && state.items.isEmpty) {
       return Center(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -239,7 +251,7 @@ class _FeedPageState extends ConsumerState<FeedPage>
                   backgroundColor: const Color(0xFFE65C00),
                 ),
                 onPressed: () =>
-                    ref.read(signalementProvider.notifier).fetchSignalements(),
+                    ref.read(signalementProvider.notifier).refresh(),
                 child: const Text('Reessayer'),
               ),
             ],
@@ -265,18 +277,58 @@ class _FeedPageState extends ConsumerState<FeedPage>
         children: [
           _buildMapButton(),
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              itemCount: state.items.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                return SignalementCard(signalement: state.items[index]);
-              },
+            child: RefreshIndicator(
+              onRefresh: () =>
+                  ref.read(signalementProvider.notifier).refresh(),
+              child: ListView.separated(
+                controller: _signalementScrollController,
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                // +1 pour le pied de liste (loader d'infinite scroll).
+                itemCount: state.items.length + 1,
+                separatorBuilder: (_, __) => const SizedBox(height: 10),
+                itemBuilder: (context, index) {
+                  if (index >= state.items.length) {
+                    return _buildListFooter(state);
+                  }
+                  return SignalementCard(signalement: state.items[index]);
+                },
+              ),
             ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildListFooter(SignalementState state) {
+    if (state.isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(
+              strokeWidth: 2.5,
+              color: Color(0xFFE65C00),
+            ),
+          ),
+        ),
+      );
+    }
+    if (!state.hasNextPage && state.items.isNotEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: Text(
+            'Vous avez tout vu.',
+            style: TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+        ),
+      );
+    }
+    return const SizedBox.shrink();
   }
 
   Widget _buildMapButton() {
