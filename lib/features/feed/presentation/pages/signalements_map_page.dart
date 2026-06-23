@@ -157,6 +157,11 @@ class _SignalementsMapPageState extends State<SignalementsMapPage> {
                       height: 44,
                       alignment: Alignment.topCenter,
                       child: GestureDetector(
+                        // Sans HitTestBehavior.opaque, le tap est capté par le
+                        // gestionnaire de gestes de la carte (flutter_map v7)
+                        // et n'atteint jamais le marqueur : le détail ne
+                        // s'ouvrait donc pas au clic.
+                        behavior: HitTestBehavior.opaque,
                         onTap: () => _openDetail(s),
                         child: const Icon(Icons.location_on,
                             color: _orange, size: 44),
