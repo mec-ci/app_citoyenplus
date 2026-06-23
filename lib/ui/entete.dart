@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/gamification_provider.dart';
 
 class EntetePersonalise extends ConsumerWidget implements PreferredSizeWidget {
   final String title;
@@ -18,7 +17,6 @@ class EntetePersonalise extends ConsumerWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final points = ref.watch(gamificationProvider).totalPoints;
     return AppBar(
       backgroundColor: Colors.white,
       elevation: 0,
@@ -32,70 +30,11 @@ class EntetePersonalise extends ConsumerWidget implements PreferredSizeWidget {
         child: Image.asset('assets/logo_MEC_1.png', fit: BoxFit.contain),
       ),
 
-      title: Text(
-        title,
-        style: const TextStyle(
-          color: Colors.black87,
-          fontWeight: FontWeight.w800,
-          fontSize: 18,
-        ),
-      ),
+      // Le titre de la page n'est plus affiché (top bar allégée).
+      title: null,
       actions: [
-        // Badge points
-        Container(
-          margin: const EdgeInsets.symmetric(vertical: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: const Color(0xFFE65C00).withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.star_rounded,
-                  color: Color(0xFFE65C00), size: 16),
-              const SizedBox(width: 3),
-              Text(
-                '$points pts',
-                style: const TextStyle(
-                  color: Color(0xFFE65C00),
-                  fontWeight: FontWeight.w800,
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
-        ),
-        IconButton(
-          onPressed: onSearchPressed,
-          icon: const Icon(Icons.search_outlined, color: Color(0xFF1556B5)),
-          tooltip: 'Rechercher',
-        ),
-        Stack(
-          alignment: Alignment.topRight,
-          children: [
-            IconButton(
-              onPressed: onNotificationPressed,
-              icon: const Icon(
-                Icons.notifications_outlined,
-                color: Color(0xFF1556B5),
-              ),
-              tooltip: 'Notifications',
-            ),
-            Positioned(
-              right: 12,
-              top: 12,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-          ],
-        ),
+        // Recherche et notifications retirées de la top bar ; les points sont
+        // désormais consultables dans le profil.
         IconButton(
           onPressed: onProfilePressed,
           icon: const Icon(
