@@ -18,13 +18,11 @@ void main() async {
   // exception ici empêcher l'appel à runApp(), sinon l'app reste sur un écran
   // blanc au démarrage. isOptional initialise un environnement vide si le
   // fichier manque, et le try/catch couvre tout autre échec (fichier illisible…).
+  // Les accès à dotenv.env (AiChatService, ApiConfig) sont eux aussi protégés.
   try {
     await dotenv.load(fileName: 'assets/.env', isOptional: true);
   } catch (e) {
     debugPrint('dotenv load error: $e');
-    // Garantit que dotenv est initialisé pour éviter une NotInitializedError
-    // lors des accès ultérieurs à dotenv.env (AiChatService, ApiConfig…).
-    dotenv.testLoad(fileInput: '');
   }
   AiChatService.init();
 
