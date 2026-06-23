@@ -10,6 +10,8 @@ class ApiEndpoints {
   static const String resetPassword = '/auth/reset-password';
 
   static const String signalementCitoyen = '/signalement-citoyen';
+  // Flux mobile : ne renvoie que les signalements validés (validation = true).
+  static const String signalementCitoyenMobile = '/signalement-citoyen/mobile';
   // Signalements de l'utilisateur connecté (citoyenId déduit du JWT côté backend).
   static const String signalementCitoyenMe = '/signalement-citoyen/me';
   static const String categorieSignalement = '/categorie-signalement';

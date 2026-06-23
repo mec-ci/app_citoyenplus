@@ -21,6 +21,7 @@ final signalementProvider =
 class SignalementState {
   final List<Signalement> items;
   final bool isLoading;
+  final bool isLoadingMore;
   final String? error;
   final bool isCreating;
   final int page;
@@ -30,6 +31,7 @@ class SignalementState {
   const SignalementState({
     this.items = const [],
     this.isLoading = false,
+    this.isLoadingMore = false,
     this.error,
     this.isCreating = false,
     this.page = 1,
@@ -40,6 +42,7 @@ class SignalementState {
   SignalementState copyWith({
     List<Signalement>? items,
     bool? isLoading,
+    bool? isLoadingMore,
     String? error,
     bool? isCreating,
     int? page,
@@ -49,6 +52,7 @@ class SignalementState {
     return SignalementState(
       items: items ?? this.items,
       isLoading: isLoading ?? this.isLoading,
+      isLoadingMore: isLoadingMore ?? this.isLoadingMore,
       error: error,
       isCreating: isCreating ?? this.isCreating,
       page: page ?? this.page,
@@ -67,28 +71,41 @@ class SignalementNotifier extends StateNotifier<SignalementState> {
 
   Future<void> fetchSignalements({int? page}) async {
     final targetPage = page ?? state.page;
-    state = state.copyWith(isLoading: true, error: null);
+    // La première page (re)charge le flux ; les suivantes l'enrichissent
+    // (défilement infini) en conservant les éléments déjà chargés.
+    final isFirstPage = targetPage <= 1;
+    state = state.copyWith(
+      isLoading: isFirstPage,
+      isLoadingMore: !isFirstPage,
+      error: null,
+    );
     try {
       final result = await _repository.getSignalements(page: targetPage, limit: state.limit);
       state = state.copyWith(
-        items: result.items,
+        items: isFirstPage ? result.items : [...state.items, ...result.items],
         isLoading: false,
+        isLoadingMore: false,
         page: targetPage,
         totalPages: result.totalPages,
         error: null,
       );
     } on AppException catch (exception) {
-      state = state.copyWith(isLoading: false, error: exception.message);
+      state = state.copyWith(
+        isLoading: false,
+        isLoadingMore: false,
+        error: exception.message,
+      );
     } catch (error) {
       state = state.copyWith(
         isLoading: false,
+        isLoadingMore: false,
         error: 'Erreur inconnue lors du chargement des signalements.',
       );
     }
   }
 
   Future<void> loadNextPage() async {
-    if (!state.hasNextPage || state.isLoading) return;
+    if (!state.hasNextPage || state.isLoading || state.isLoadingMore) return;
     await fetchSignalements(page: state.page + 1);
   }
 

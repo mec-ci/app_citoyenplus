@@ -30,8 +30,9 @@ class SignalementRepository implements ISignalementRepository {
   @override
   Future<SignalementResult> getSignalements({int page = 1, int limit = 20}) async {
     try {
+      // Flux mobile : seuls les signalements validés sont retournés.
       final response = await _dio.get(
-        ApiEndpoints.signalementCitoyen,
+        ApiEndpoints.signalementCitoyenMobile,
         queryParameters: {'page': page, 'limit': limit},
       );
       final data = response.data;
