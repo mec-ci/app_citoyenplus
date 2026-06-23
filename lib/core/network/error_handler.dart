@@ -30,8 +30,15 @@ class HttpErrorHandler {
     );
   }
 
-  static String extractErrorMessage(DioException error) {
-    final response = error.response;
+  /// Message lisible pour une erreur quelconque (DioException ou autre).
+  /// Utilisé pour afficher la vraie cause d'un échec à l'utilisateur plutôt
+  /// qu'un message générique.
+  static String describe(Object error) {
+    if (error is DioException) return extractErrorMessage(error);
+    return 'Une erreur est survenue.';
+  }
+
+  static String extractErrorMessage(DioException error) {    final response = error.response;
     final statusCode = response?.statusCode;
     final data = response?.data;
 

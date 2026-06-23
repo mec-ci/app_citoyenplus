@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:citoyen_plus/features/feed/domain/models/feed_item.dart';
+import 'package:citoyen_plus/core/network/error_handler.dart';
 import 'package:citoyen_plus/models/post.dart';
 import 'package:citoyen_plus/services/api_service.dart';
 import 'package:citoyen_plus/services/commentaire_service.dart';
@@ -106,13 +107,16 @@ class _ActualiteDetailViewState extends State<ActualiteDetailView> {
         _likeCount = result.likesCount;
         _likeInFlight = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _liked = previousLiked;
         _likeCount = previousCount;
         _likeInFlight = false;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Like impossible : ${HttpErrorHandler.describe(e)}')),
+      );
     }
   }
 

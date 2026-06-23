@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../core/network/error_handler.dart';
 import '../services/commentaire_service.dart';
 import '../services/user_service.dart';
 
@@ -105,10 +106,10 @@ class _CommentairesSheetState extends State<CommentairesSheet> {
         _loading = false;
       });
       _notifyCount();
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = 'Impossible de charger les commentaires.';
+        _error = HttpErrorHandler.describe(e);
         _loading = false;
       });
     }
@@ -159,11 +160,11 @@ class _CommentairesSheetState extends State<CommentairesSheet> {
         _sending = false;
       });
       _notifyCount();
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _sending = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Échec de l'envoi du commentaire.")),
+        SnackBar(content: Text("Échec de l'envoi : ${HttpErrorHandler.describe(e)}")),
       );
     }
   }
@@ -203,10 +204,10 @@ class _CommentairesSheetState extends State<CommentairesSheet> {
         if (_total > 0) _total -= 1;
       });
       _notifyCount();
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Échec de la suppression du commentaire.')),
+        SnackBar(content: Text('Échec de la suppression : ${HttpErrorHandler.describe(e)}')),
       );
     }
   }
