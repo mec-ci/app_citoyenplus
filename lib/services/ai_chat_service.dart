@@ -14,7 +14,16 @@ class AiChatService {
   static const String _baseUrl = 'https://api.deepseek.com';
 
   static void init() {
-    _apiKey = dotenv.env['DEEPSEEK_API_KEY'] ?? 'sk-f72bd6d7b6224e3cba7ecbeea84575ae';
+    String? envKey;
+    try {
+      envKey = dotenv.env['DEEPSEEK_API_KEY'];
+    } catch (_) {
+      // dotenv non initialisé (fichier .env absent du build).
+      envKey = null;
+    }
+    _apiKey = (envKey == null || envKey.isEmpty)
+        ? 'sk-f72bd6d7b6224e3cba7ecbeea84575ae'
+        : envKey;
     debugPrint('AiChatService: DeepSeek API key loaded = ${_apiKey != null && _apiKey!.isNotEmpty}');
   }
 
