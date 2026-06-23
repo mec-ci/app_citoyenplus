@@ -144,9 +144,12 @@ class ApiService {
     double? latitude,
     double? longitude,
     double? radiusKm,
+    String? search,
   }) async {
     final query = <String, dynamic>{'page': page, 'limit': limit};
     if (citoyenId != null) query['citoyenId'] = citoyenId;
+    // Recherche textuelle : filtrée côté backend lorsqu'un mot-clé est fourni.
+    if (search != null && search.trim().isNotEmpty) query['search'] = search;
     // Recherche « autour de moi » : envoyée au backend (filtre par rayon + tri
     // par distance) lorsque coordonnées et rayon sont fournis.
     if (latitude != null && longitude != null && radiusKm != null) {
