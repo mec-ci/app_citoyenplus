@@ -3,6 +3,7 @@ import 'package:citoyen_plus/features/feed/domain/models/feed_item.dart';
 import 'package:citoyen_plus/features/feed/presentation/pages/actualite_detail_view.dart';
 import 'package:citoyen_plus/services/commentaire_service.dart';
 import 'package:citoyen_plus/services/reaction_service.dart';
+import 'package:citoyen_plus/core/network/error_handler.dart';
 import 'package:citoyen_plus/widgets/commentaires_sheet.dart';
 import 'package:citoyen_plus/widgets/simple_html_view.dart';
 import 'package:flutter/material.dart';
@@ -49,13 +50,16 @@ class _FeedActualiteCardState extends State<FeedActualiteCard> {
         _likeCount = result.likesCount;
         _likeInFlight = false;
       });
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() {
         _liked = previousLiked;
         _likeCount = previousCount;
         _likeInFlight = false;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Like impossible : ${HttpErrorHandler.describe(e)}')),
+      );
     }
   }
 
