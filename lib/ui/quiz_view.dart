@@ -118,6 +118,11 @@ class _QuizViewState extends State<QuizView> {
   /// Groupe les quiz de l'API par catégorie et construit les descripteurs de
   /// la grille. La clé de regroupement est `categorie.id` lorsqu'elle est
   /// disponible, sinon le nom de la catégorie.
+  ///
+  /// Côté backend, `categorie` ET `difficulte` sont OPTIONNELS (`categorie:
+  /// CategorieQuiz?`, `difficulte: QuizDifficulte?`). Un quiz peut donc être
+  /// renvoyé sans catégorie et/ou sans difficulté : ces quiz doivent quand
+  /// même apparaître, sinon « certains quiz » disparaissent de la grille.
   List<Map<String, dynamic>> _buildCategoriesFromQuizzes(
     List<ApiQuiz> quizzes,
   ) {
@@ -125,8 +130,18 @@ class _QuizViewState extends State<QuizView> {
     final Map<String, List<ApiQuiz>> groups = {};
     final Map<String, String> groupTitle = {};
     for (final q in quizzes) {
-      final key = q.categorieId.isNotEmpty ? q.categorieId : q.categorieNom;
-      if (key.isEmpty) continue;
+      // Quiz sans contenu jouable : inutile de l'afficher.
+      if (q.questions.isEmpty) continue;
+      // Clé de catégorie : id → nom → repli sur le quiz lui-même (`quiz:<id>`)
+      // pour ne PAS perdre les quiz sans catégorie.
+      final String key;
+      if (q.categorieId.isNotEmpty) {
+        key = q.categorieId;
+      } else if (q.categorieNom.isNotEmpty) {
+        key = q.categorieNom;
+      } else {
+        key = 'quiz:${q.id}';
+      }
       groups.putIfAbsent(key, () => []).add(q);
       groupTitle.putIfAbsent(
         key,
@@ -138,12 +153,26 @@ class _QuizViewState extends State<QuizView> {
     var index = 0;
     for (final entry in groups.entries) {
       final quizzesByLevel = <int, ApiQuiz>{};
+      // 1) Affectation par difficulté explicite (FACILE/MOYEN/DIFFICILE).
       for (var level = 1; level <= 3; level++) {
         final wanted = _difficulteForLevel(level);
-        // On ne retient qu'un quiz NON VIDE pour cette difficulté.
         final match = entry.value
             .where((q) => q.difficulte == wanted && q.questions.isNotEmpty);
         if (match.isNotEmpty) quizzesByLevel[level] = match.first;
+      }
+      // 2) Repli pour les quiz à difficulté NULLE ou inconnue : on les place
+      //    dans le premier niveau libre afin qu'ils restent jouables au lieu
+      //    de disparaître silencieusement.
+      final placed = quizzesByLevel.values.map((q) => q.id).toSet();
+      final leftover = entry.value
+          .where((q) => q.questions.isNotEmpty && !placed.contains(q.id));
+      for (final q in leftover) {
+        final freeLevel = [1, 2, 3].firstWhere(
+          (lvl) => !quizzesByLevel.containsKey(lvl),
+          orElse: () => -1,
+        );
+        if (freeLevel == -1) break; // les 3 niveaux sont déjà pourvus
+        quizzesByLevel[freeLevel] = q;
       }
       // Catégorie sans aucun niveau jouable : on ne l'affiche pas.
       if (quizzesByLevel.isEmpty) continue;
