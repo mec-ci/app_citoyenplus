@@ -87,6 +87,7 @@ flutter:
 
   assets:
     - assets/
+    - .env
 
   fonts:
     - family: Metropolis

@@ -20,7 +20,8 @@ void main() async {
   // fichier manque, et le try/catch couvre tout autre échec (fichier illisible…).
   // Les accès à dotenv.env (AiChatService, ApiConfig) sont eux aussi protégés.
   try {
-    await dotenv.load(fileName: 'assets/.env', isOptional: true);
+    await dotenv.load(fileName: ".env");
+    debugPrint('dotenv loaded');
   } catch (e) {
     debugPrint('dotenv load error: $e');
   }
